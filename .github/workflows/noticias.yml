@@ -29,19 +29,17 @@ jobs:
       run: |
         python generar_noticias.py
     
+    - name: Verificar archivos generados
+      run: |
+        echo "=== Contenido de noticias/ ==="
+        ls -la noticias/ || echo "Carpeta noticias/ no encontrada"
+    
     - name: Deploy vía FTP a Hostinger
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: 82.29.185.65
         username: u208113460.github
         password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: ./
-        server-dir: ./
-        exclude: |
-          **/.git*
-          **/.git*/**
-          **/node_modules/**
-          .github/**
-          generar_noticias.py
-          requirements.txt
-          INSTRUCCIONES.md
+        local-dir: ./noticias/
+        server-dir: /public_html/noticias/
+        log-level: verbose
