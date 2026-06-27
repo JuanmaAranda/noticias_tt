@@ -1,0 +1,55 @@
+name: Generar Noticias Automáticas + Deploy FTP
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  generar-noticias:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout del repositorio
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Instalar dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Ejecutar generador de noticias
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        python generar_noticias.py
+
+    - name: Commit y push de los cambios
+      run: |
+        git config user.name "TikPanel Bot"
+        git config user.email "bot@tikpanel.app"
+        git add noticias/ .github/estado_noticias.json
+        git diff --staged --quiet || git commit -m "🤖 Noticias automáticas: $(date +%Y-%m-%d)"
+        git push
+
+    - name: Deploy vía FTP a Hostinger
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ftp.tikpanel.app
+        username: u208113460.github
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./
+        server-dir: ./
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/node_modules/**
+          .github/**
+          generar_noticias.py
+          requirements.txt
+          INSTRUCCIONES.md
