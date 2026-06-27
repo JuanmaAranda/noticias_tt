@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""TikPanel - Generador de Noticias Automáticas (PythonAnywhere)"""
+"""TikPanel - Generador de Noticias Automáticas (GitHub Actions)"""
 
 import os
 import json
@@ -9,26 +9,16 @@ import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 import xml.etree.ElementTree as ET
-import ftplib
 
 import requests
 from openai import OpenAI
 
-# ════════════════════════════════════════════════════════════
-# CONFIGURACIÓN - EDITAR ESTAS VARIABLES
-# ════════════════════════════════════════════════════════════
+# ============================================================
+# CONFIGURACIÓN
+# ============================================================
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-REEMPLAZA-ESTO-CON-TU-API-KEY")
 
-FTP_HOST = "ftp.tikpanel.app"
-FTP_USER = "u208113460.github"
-FTP_PASS = "3Kk:~+eR;V*"
-
-REMOTE_DIR = "/noticias"
-LOCAL_DIR = Path(".")
-
-# Nota: PythonAnywhere gratuito bloquea algunos dominios.
-# Solo Google News RSS funciona seguro. Usamos varias queries.
 FEEDS = [
     "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
     "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
@@ -46,9 +36,13 @@ KEYWORDS = [
 MAX_NOTICIAS_POR_DIA = 2
 
 client = OpenAI(api_key=OPENAI_API_KEY)
-NOTICIAS_DIR = LOCAL_DIR / "noticias"
-ESTADO_FILE = LOCAL_DIR / "estado_noticias.json"
-NOTICIAS_DIR.mkdir(parents=True, exist_ok=True)
+NOTICIAS_DIR = Path("noticias")
+ESTADO_FILE = Path("estado_noticias.json")
+NOTICIAS_DIR.mkdir(exist_ok=True)
+
+# ============================================================
+# FUNCIONES AUXILIARES
+# ============================================================
 
 def log(msg):
     print("[" + datetime.now().strftime("%H:%M:%S") + "] " + msg)
@@ -81,7 +75,6 @@ def parsear_fecha(fecha_str):
     for fmt in formatos:
         try:
             dt = datetime.strptime(fecha_str.strip(), fmt)
-            # Convertir a naive (sin timezone) para evitar errores de comparacion
             if dt.tzinfo:
                 dt = dt.replace(tzinfo=None)
             return dt
@@ -133,6 +126,10 @@ def generar_slug(titulo):
     slug = slug[:60].strip("-")
     return slug + ".html"
 
+# ============================================================
+# GENERAR ARTÍCULO CON IA
+# ============================================================
+
 def generar_articulo_ia(titulo, descripcion, url_fuente):
     prompt = (
         "Eres un redactor experto en redes sociales para TikPanel (tikpanel.app).\n\n"
@@ -171,7 +168,7 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         )
         texto = respuesta.choices[0].message.content.strip()
         titulo_match = re.search(r"TITULO:\s*(.+?)(?=\n|CONTENIDO:)", texto, re.DOTALL)
-        contenido_match = re.search(r"CONTENIDO:\s*(.+)" , texto, re.DOTALL)
+        contenido_match = re.search(r"CONTENIDO:\s*(.+)", texto, re.DOTALL)
         nuevo_titulo = titulo_match.group(1).strip() if titulo_match else titulo
         contenido = contenido_match.group(1).strip() if contenido_match else texto
         return nuevo_titulo, contenido
@@ -179,6 +176,10 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         log("Error con OpenAI: " + str(e))
         contenido_fallback = "<p>" + descripcion + "</p><p><strong>Fuente original:</strong> <a href=\"" + url_fuente + "\" target=\"_blank\">" + url_fuente + "</a></p>"
         return titulo, contenido_fallback
+
+# ============================================================
+# CREAR HTML CON TEMA OSCURO
+# ============================================================
 
 def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
     fecha_formateada = fecha.strftime("%d de %B de %Y") if fecha else datetime.now().strftime("%d de %B de %Y")
@@ -195,46 +196,34 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         "    <link rel=\"stylesheet\" href=\"../css/style.css\">\n"
         "</head>\n"
         "<body>\n"
-        "<header class=\"site-header\">\n"
-        "    <nav class=\"main-nav\">\n"
-        "        <a href=\"../index.html\" class=\"logo\">TikPanel</a>\n"
-        "        <ul class=\"nav-links\">\n"
-        "            <li><a href=\"../index.html\">Inicio</a></li>\n"
-        "            <li><a href=\"../precios.html\">Precios</a></li>\n"
-        "            <li><a href=\"../blog/index.html\">Blog</a></li>\n"
-        "            <li><a href=\"index.html\" class=\"active\">Noticias</a></li>\n"
-        "            <li><a href=\"../soporte.html\">Soporte</a></li>\n"
-        "        </ul>\n"
-        "    </nav>\n"
-        "</header>\n"
+        "<div id=\"navbar-container\"></div>\n"
         "\n"
-        "<main class=\"container\">\n"
-        "    <article class=\"noticia-articulo\">\n"
-        "        <header class=\"noticia-header\">\n"
-        "            <div class=\"noticia-meta\">\n"
-        "                <span class=\"noticia-fecha\">📅 " + fecha_formateada + "</span>\n"
-        "                <span class=\"noticia-tag\">TikTok</span>\n"
+        "<main class=\"noticia-article-layout\">\n"
+        "    <div class=\"container noticia-article-container\">\n"
+        "        <article>\n"
+        "            <header class=\"noticia-header\">\n"
+        "                <div class=\"noticia-meta\">\n"
+        "                    <span class=\"noticia-tag\">📰 TikTok</span>\n"
+        "                    <span>" + fecha_formateada + "</span>\n"
+        "                </div>\n"
+        "                <h1>" + titulo + "</h1>\n"
+        "            </header>\n"
+        "            <div class=\"noticia-contenido\">\n"
+        "                " + contenido + "\n"
+        "                <div class=\"noticia-disclaimer\">\n"
+        "                    <strong>⚠️ Aviso:</strong> Este articulo es un <strong>resumen generado automaticamente por IA</strong> a partir de noticias publicas.\n"
+        "                    La informacion original proviene de: <a href=\"" + url_fuente + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + url_fuente + "</a>\n"
+        "                </div>\n"
         "            </div>\n"
-        "            <h1>" + titulo + "</h1>\n"
-        "        </header>\n"
-        "        <div class=\"noticia-contenido\">\n"
-        "            " + contenido + "\n"
-        "            <hr>\n"
-        "            <p class=\"noticia-disclaimer\">\n"
-        "                <small>⚠️ Este articulo es un <strong>resumen generado automaticamente por IA</strong> "
-        "                a partir de noticias publicas. La informacion original proviene de: "
-        "                <a href=\"" + url_fuente + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + url_fuente + "</a></small>\n"
-        "            </p>\n"
-        "        </div>\n"
-        "        <footer class=\"noticia-footer\">\n"
-        "            <a href=\"index.html\" class=\"btn btn-secondary\">← Volver a todas las noticias</a>\n"
-        "        </footer>\n"
-        "    </article>\n"
+        "            <footer class=\"noticia-footer\">\n"
+        "                <a href=\"index.html\" class=\"noticia-nav-back\">← Volver a todas las noticias</a>\n"
+        "            </footer>\n"
+        "        </article>\n"
+        "    </div>\n"
         "</main>\n"
         "\n"
-        "<footer class=\"site-footer\">\n"
-        "    <p>© " + str(anio) + " TikPanel. Todos los derechos reservados.</p>\n"
-        "</footer>\n"
+        "<div id=\"footer-container\"></div>\n"
+        "<script src=\"../shared-components.js\"></script>\n"
         "</body>\n"
         "</html>"
     )
@@ -247,7 +236,7 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
 def actualizar_index():
     entradas = []
     for f in sorted(NOTICIAS_DIR.glob("*.html")):
-        if f.name in ["index.html", "plantilla.html"]:
+        if f.name == "index.html":
             continue
         fecha_match = re.search(r"-(\d{4}-\d{2}-\d{2})\.html$", f.name)
         if fecha_match:
@@ -275,11 +264,14 @@ def actualizar_index():
     for e in entradas[:30]:
         items_html += (
             "<article class=\"noticia-card\">\n"
-            "    <div class=\"noticia-card-meta\">\n"
-            "        <span class=\"noticia-card-fecha\">" + e["fecha_str"] + "</span>\n"
+            "    <div class=\"noticia-card-body\">\n"
+            "        <div class=\"noticia-card-meta\">\n"
+            "            <span class=\"noticia-card-fecha\">📅 " + e["fecha_str"] + "</span>\n"
+            "        </div>\n"
+            "        <h3><a href=\"" + e["archivo"] + "\">" + e["titulo"] + "</a></h3>\n"
+            "        <p class=\"noticia-card-excerpt\">Resumen de la noticia sobre TikTok. Haz clic para leer el articulo completo.</p>\n"
+            "        <a href=\"" + e["archivo"] + "\" class=\"noticia-card-cta\">Leer mas →</a>\n"
             "    </div>\n"
-            "    <h3><a href=\"" + e["archivo"] + "\">" + e["titulo"] + "</a></h3>\n"
-            "    <a href=\"" + e["archivo"] + "\" class=\"btn btn-small\">Leer mas →</a>\n"
             "</article>\n"
         )
     
@@ -291,40 +283,35 @@ def actualizar_index():
         "    <meta charset=\"UTF-8\">\n"
         "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
         "    <title>Noticias sobre TikTok | TikPanel</title>\n"
-        "    <meta name=\"description\" content=\"Noticias diarias automaticas sobre TikTok.\">\n"
+        "    <meta name=\"description\" content=\"Noticias diarias automaticas sobre TikTok, algoritmo, creadores y tendencias.\">\n"
         "    <link rel=\"stylesheet\" href=\"../css/style.css\">\n"
         "</head>\n"
         "<body>\n"
-        "<header class=\"site-header\">\n"
-        "    <nav class=\"main-nav\">\n"
-        "        <a href=\"../index.html\" class=\"logo\">TikPanel</a>\n"
-        "        <ul class=\"nav-links\">\n"
-        "            <li><a href=\"../index.html\">Inicio</a></li>\n"
-        "            <li><a href=\"../precios.html\">Precios</a></li>\n"
-        "            <li><a href=\"../blog/index.html\">Blog</a></li>\n"
-        "            <li><a href=\"index.html\" class=\"active\">Noticias</a></li>\n"
-        "            <li><a href=\"../soporte.html\">Soporte</a></li>\n"
-        "        </ul>\n"
-        "    </nav>\n"
-        "</header>\n"
+        "<div id=\"navbar-container\"></div>\n"
         "\n"
-        "<main class=\"container\">\n"
+        "<main>\n"
         "    <section class=\"noticias-hero\">\n"
-        "        <h1>📰 Noticias sobre TikTok</h1>\n"
-        "        <p>Resumen diario automatico de las noticias mas relevantes sobre TikTok, el algoritmo, monetizacion y tendencias.</p>\n"
-        "        <p class=\"noticias-disclaimer\">\n"
-        "            <small>⚠️ Los articulos son generados automaticamente por IA a partir de fuentes publicas. Siempre se incluye el enlace a la noticia original.</small>\n"
-        "        </p>\n"
+        "        <div class=\"noticias-hero-bg\"></div>\n"
+        "        <div class=\"noticias-hero-content\">\n"
+        "            <h1>📰 Noticias sobre TikTok</h1>\n"
+        "            <p>Resumen diario automatico de las noticias mas relevantes sobre TikTok, el algoritmo, monetizacion y tendencias para creadores.</p>\n"
+        "            <p class=\"noticias-disclaimer\">\n"
+        "                <small>⚠️ Los articulos son generados automaticamente por IA a partir de fuentes publicas. Siempre se incluye el enlace a la noticia original.</small>\n"
+        "            </p>\n"
+        "        </div>\n"
         "    </section>\n"
         "\n"
-        "    <section class=\"noticias-grid\">\n"
-        "        " + items_html + "\n"
+        "    <section class=\"noticias-section\">\n"
+        "        <div class=\"container\">\n"
+        "            <div class=\"noticias-grid\">\n"
+        "                " + items_html + "\n"
+        "            </div>\n"
+        "        </div>\n"
         "    </section>\n"
         "</main>\n"
         "\n"
-        "<footer class=\"site-footer\">\n"
-        "    <p>© " + str(anio) + " TikPanel. Todos los derechos reservados.</p>\n"
-        "</footer>\n"
+        "<div id=\"footer-container\"></div>\n"
+        "<script src=\"../shared-components.js\"></script>\n"
         "</body>\n"
         "</html>"
     )
@@ -332,34 +319,9 @@ def actualizar_index():
     with open(NOTICIAS_DIR / "index.html", "w", encoding="utf-8") as f:
         f.write(html)
 
-def subir_por_ftp():
-    try:
-        log("Conectando por FTP...")
-        ftp = ftplib.FTP(FTP_HOST, timeout=30)
-        ftp.login(FTP_USER, FTP_PASS)
-        log("Conectado a " + FTP_HOST)
-        
-        try:
-            ftp.cwd(REMOTE_DIR)
-        except ftplib.error_perm:
-            log("Creando directorio remoto " + REMOTE_DIR + "...")
-            ftp.mkd(REMOTE_DIR)
-            ftp.cwd(REMOTE_DIR)
-        
-        archivos_subidos = 0
-        for archivo in NOTICIAS_DIR.glob("*.html"):
-            nombre = archivo.name
-            with open(archivo, "rb") as f:
-                ftp.storbinary("STOR " + nombre, f)
-            log("Subido: " + nombre)
-            archivos_subidos += 1
-        
-        ftp.quit()
-        log("FTP completado. " + str(archivos_subidos) + " archivo(s) subido(s).")
-        return True
-    except Exception as e:
-        log("Error en FTP: " + str(e))
-        return False
+# ============================================================
+# MAIN
+# ============================================================
 
 def main():
     log("Iniciando generacion de noticias automaticas...")
@@ -414,7 +376,7 @@ def main():
         )
         procesados.add(noticia["id"])
         nuevas_slugs.append(slug)
-        log("Guardado localmente: noticias/" + slug)
+        log("Guardado: noticias/" + slug)
     
     log("Actualizando indice de noticias...")
     actualizar_index()
@@ -423,16 +385,10 @@ def main():
     estado["ultima_ejecucion"] = ahora.isoformat()
     guardar_estado(estado)
     
-    log("Subiendo archivos al hosting por FTP...")
-    exito = subir_por_ftp()
-    
-    if exito:
-        log("Listo! Se publicaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
-        for s in nuevas_slugs:
-            log("   → https://tikpanel.app/noticias/" + s)
-    else:
-        log("Las noticias se generaron pero no se pudieron subir por FTP.")
-        log("Revisa los datos de FTP en la configuracion del script.")
+    log("Listo! Se generaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
+    for s in nuevas_slugs:
+        log("   → noticias/" + s)
 
 if __name__ == "__main__":
     main()
+
