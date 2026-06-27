@@ -138,7 +138,7 @@ def limpiar_contenido_ia(contenido):
         if len(url) > 60:
             return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">Ver fuente</a>'
         return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>'
-    contenido = re.sub(r"(https?://[^\s<>"]+)", link_replacer, contenido)
+    contenido = re.sub(r'(https?://[^\s<>"]+)', link_replacer, contenido)
     # Eliminar líneas que empiecen con "--- Fuente original:" o similares
     contenido = re.sub(r"<p>\s*---+\s*Fuente original:.*?</p>", "", contenido, flags=re.DOTALL)
     contenido = re.sub(r"---+\s*Fuente original:.*", "", contenido, flags=re.DOTALL)
