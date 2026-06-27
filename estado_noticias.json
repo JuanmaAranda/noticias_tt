@@ -1,23 +1,37 @@
 {
   "procesados": [
-    "9be2abfa55705fb9ee55efe70d5c212a",
-    "f0539f85204b7ccbe754b410f491cc99",
+    "b58b2f0ada79cdf6a488dfe8bf480263",
     "c5cf749c9eef427109dce529c55d93ba",
     "c80a6f697823b31edd74f5335c26422d",
-    "b58b2f0ada79cdf6a488dfe8bf480263",
+    "adde1737960005d43941772e10921c32",
     "26d4862d078b2183e876e3a376311b4e",
+    "80d03071b5e1b30ac04b0639736ccd0d",
+    "004a40b5858d7cb3afbc4f72b1fc0f9f",
+    "9be2abfa55705fb9ee55efe70d5c212a",
     "4a5f3a5e420d768f38fc9bff939fd201",
-    "004a40b5858d7cb3afbc4f72b1fc0f9f"
+    "f0539f85204b7ccbe754b410f491cc99"
   ],
-  "ultima_ejecucion": "2026-06-27T18:44:29.730167",
+  "ultima_ejecucion": "2026-06-27T19:42:50.195300",
   "extractos": {
     "mujer-compra-casa-en-italia-por-1-euro-y-se-vuelve-viral-en.html": "Una mujer ha captado la atención de millones de usuarios en TikTok tras compartir su increíble experiencia al comprar una casa en Italia...",
-    "okdiario-supera-los-2-millones-de-seguidores-en-tiktok.html": "OKDIARIO, el medio de comunicación digital, ha alcanzado recientemente la impresionante cifra de 2 millones de seguidores en TikTok,...",
     "la-favela-brasileña-que-transformó-armas-en-tecnología-viral.html": "En un giro sorprendente, una favela de Brasil, anteriormente conocida como epicentro de actividades delictivas, ha dado un paso hacia la...",
     "los-creadores-más-influyentes-de-2026-de-tiktok-a-imperios-g.html": "El mundo digital sigue evolucionando y, con él, la figura del creador de contenido. En 2026, se vislumbran nombres que han logrado...",
     "strongyass-naubelle-influencer-marroquí-condenada-por-critic.html": "La influencer marroquí Yass Naubelle ha sido sentenciada a prisión tras publicar un video en TikTok donde critica las acciones de la...",
-    "estrella-de-tiktok-enfrenta-pena-de-muerte-por-asesinato-en.html": "Una influencer de TikTok se encuentra en el centro de un escándalo legal tras ser acusada del asesinato de su novio en Dubái, lo que podría...",
     "youtube-lanza-nuevas-funciones-en-shorts-para-competir-con-t.html": "YouTube ha dado un paso significativo para acercar su plataforma de Shorts a la experiencia que ofrece TikTok, implementando un modo de...",
-    "tiktok-de-euronews-voz-para-las-víctimas-del-terremoto-en-ve.html": "En un esfuerzo por visibilizar el sufrimiento de las víctimas del reciente doble terremoto en Venezuela, el canal de noticias Euronews ha..."
-  }
+    "tiktok-de-euronews-voz-para-las-víctimas-del-terremoto-en-ve.html": "En un esfuerzo por visibilizar el sufrimiento de las víctimas del reciente doble terremoto en Venezuela, el canal de noticias Euronews ha...",
+    "indonesia-desactiva-casi-5-millones-de-cuentas-en-tiktok-y-y.html": "La reciente implementación de una nueva normativa gubernamental en Indonesia ha dado lugar a la desactivación de aproximadamente 5 millones...",
+    "tiktoker-británica-en-riesgo-de-ejecución-por-homicidio-en-d.html": "Una Tiktoker británica se encuentra en el centro de una controversia internacional tras ser acusada de homicidio en Dubái, lo que podría..."
+  },
+  "titulos": [
+    "Influencer Yass Naubelle condenada a prisión en Marruecos por críticas a la policía",
+    "La favela brasileña que transformó armas en tecnología viral",
+    "La impresionante playa de arena negra que arrasa en TikTok",
+    "Los Creadores Más Influyentes de 2026: De TikTok a Imperios Globales",
+    "Mujer compra casa en Italia por 1 euro y se vuelve viral en TikTok",
+    "<strong>Yass Naubelle, influencer marroquí, condenada por criticar a la policía</strong>",
+    "TikTok de Euronews: Voz para las víctimas del terremoto en Venezuela",
+    "YouTube lanza nuevas funciones en Shorts para competir con TikTok",
+    "Indonesia desactiva casi 5 millones de cuentas en TikTok y YouTube",
+    "Tiktoker británica en riesgo de ejecución por homicidio en Dubái"
+  ]
 }
