@@ -6,6 +6,7 @@ import os
 import json
 import re
 import hashlib
+import difflib
 from datetime import datetime, timedelta
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -38,6 +39,7 @@ KEYWORDS = [
 ]
 
 MAX_NOTICIAS_POR_DIA = 2
+SIMILITUD_MINIMA = 0.75  # 75% de similitud = duplicado
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 NOTICIAS_DIR = Path("noticias")
@@ -64,6 +66,15 @@ def es_relevante(titulo, descripcion=""):
 
 def generar_id(url, titulo):
     return hashlib.md5((url + titulo).encode()).hexdigest()
+
+def titulo_similar(titulo, titulos_existentes, umbral=SIMILITUD_MINIMA):
+    """Comprueba si el título es similar a alguno ya procesado."""
+    titulo_norm = normalizar_texto(titulo)
+    for t in titulos_existentes:
+        similitud = difflib.SequenceMatcher(None, titulo_norm, normalizar_texto(t)).ratio()
+        if similitud >= umbral:
+            return True, t, similitud
+    return False, None, 0
 
 def parsear_fecha(fecha_str):
     formatos = [
@@ -118,11 +129,41 @@ def cargar_estado():
                     return json.loads(contenido)
         except (json.JSONDecodeError, ValueError):
             log("⚠️ estado_noticias.json corrupto, iniciando desde cero")
-    return {"procesados": [], "ultima_ejecucion": None, "extractos": {}}
+    return {"procesados": [], "ultima_ejecucion": None, "extractos": {}, "titulos": []}
 
 def guardar_estado(estado):
     with open(ESTADO_FILE, "w", encoding="utf-8") as f:
         json.dump(estado, f, ensure_ascii=False, indent=2)
+
+def limpiar_estado(estado):
+    """Elimina del estado los artículos cuyo archivo HTML ya no existe."""
+    archivos_existentes = {f.name for f in NOTICIAS_DIR.glob("*.html") if f.name != "index.html"}
+
+    # Limpiar extractos
+    extractos = estado.get("extractos", {})
+    extractos_limpio = {k: v for k, v in extractos.items() if k in archivos_existentes}
+    if len(extractos_limpio) != len(extractos):
+        log("🧹 Eliminados " + str(len(extractos) - len(extractos_limpio)) + " extractos de artículos borrados")
+
+    # Limpiar titulos (solo mantener los que aún existen)
+    titulos = estado.get("titulos", [])
+    # Reconstruir lista de titulos a partir de archivos existentes
+    titulos_limpio = []
+    for f in sorted(NOTICIAS_DIR.glob("*.html")):
+        if f.name == "index.html":
+            continue
+        try:
+            with open(f, "r", encoding="utf-8") as file:
+                html = file.read()
+                t_match = re.search(r"<title>(.+?)\s*\|", html)
+                if t_match:
+                    titulos_limpio.append(t_match.group(1).strip())
+        except:
+            pass
+
+    estado["extractos"] = extractos_limpio
+    estado["titulos"] = titulos_limpio
+    return estado
 
 def generar_slug(titulo):
     slug = normalizar_texto(titulo)
@@ -132,13 +173,11 @@ def generar_slug(titulo):
     return slug + ".html"
 
 def limpiar_markdown(contenido):
-    """Convierte markdown residual a HTML."""
     contenido = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", contenido)
     contenido = re.sub(r"(?<!\*)\*(.+?)\*(?!\*)", r"<em>\1</em>", contenido)
     return contenido
 
 def limpiar_urls(contenido):
-    """Convierte URLs sueltas a links cortos."""
     patron = re.compile(r"(https?://[^\s<>]+)")
     def link_replacer(match):
         url = match.group(1)
@@ -148,7 +187,6 @@ def limpiar_urls(contenido):
     return patron.sub(link_replacer, contenido)
 
 def limpiar_fuentes(contenido):
-    """Elimina lineas de fuente original del contenido."""
     contenido = re.sub(r"<p>\s*---+\s*Fuente original:.*?</p>", "", contenido, flags=re.DOTALL)
     contenido = re.sub(r"---+\s*Fuente original:.*", "", contenido, flags=re.DOTALL)
     return contenido.strip()
@@ -425,8 +463,13 @@ def main():
     log("Fecha: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     estado = cargar_estado()
+
+    # LIMPIAR: eliminar del estado los artículos borrados manualmente
+    estado = limpiar_estado(estado)
+
     procesados = set(estado.get("procesados", []))
     extractos = estado.get("extractos", {})
+    titulos_procesados = estado.get("titulos", [])
 
     todas_noticias = []
     for feed_url in FEEDS:
@@ -446,12 +489,18 @@ def main():
             continue
         if not es_relevante(item["titulo"], item["descripcion"]):
             continue
+        # DETECTAR DUPLICADOS SIMILARES
+        similar, titulo_similar, ratio = titulo_similar(item["titulo"], titulos_procesados)
+        if similar:
+            log("   ⏭ Saltado (similar a: " + titulo_similar + ", ratio=" + str(round(ratio, 2)) + ")")
+            continue
         candidatas.append({**item, "id": noticia_id})
 
     log(str(len(candidatas)) + " noticias candidatas tras filtrar")
 
     if not candidatas:
         log("No hay noticias nuevas relevantes hoy. Saliendo.")
+        guardar_estado(estado)
         return
 
     a_procesar = candidatas[:MAX_NOTICIAS_POR_DIA]
@@ -475,6 +524,7 @@ def main():
         procesados.add(noticia["id"])
         extracto = generar_extracto(contenido_ia)
         extractos[slug] = extracto
+        titulos_procesados.append(titulo_ia)
         nuevas_slugs.append(slug)
         log("Guardado: noticias/" + slug)
 
@@ -483,6 +533,7 @@ def main():
 
     estado["procesados"] = list(procesados)
     estado["extractos"] = extractos
+    estado["titulos"] = titulos_procesados
     estado["ultima_ejecucion"] = ahora.isoformat()
     guardar_estado(estado)
 
@@ -492,8 +543,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-if __name__ == "__main__":
-    main()
-
