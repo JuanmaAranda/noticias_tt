@@ -34,12 +34,13 @@ jobs:
         echo "=== Contenido de noticias/ ==="
         ls -la noticias/ || echo "Carpeta noticias/ no encontrada"
     
-    - name: Deploy vía FTP a Hostinger
+    - name: Deploy vía FTPS a Hostinger
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: 82.29.185.65
         username: u208113460.github
         password: ${{ secrets.FTP_PASSWORD }}
+        protocol: ftps
         local-dir: ./noticias/
         server-dir: /public_html/noticias/
         log-level: verbose
