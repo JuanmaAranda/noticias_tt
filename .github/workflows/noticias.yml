@@ -56,7 +56,3 @@ jobs:
         local-dir: ./noticias/
         server-dir: /noticias/
         log-level: verbose
-
-        local-dir: ./noticias/
-        server-dir: /noticias/
-        log-level: verbose
