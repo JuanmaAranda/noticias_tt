@@ -67,7 +67,7 @@ def es_relevante(titulo, descripcion=""):
 def generar_id(url, titulo):
     return hashlib.md5((url + titulo).encode()).hexdigest()
 
-def titulo_similar(titulo, titulos_existentes, umbral=SIMILITUD_MINIMA):
+def comprobar_titulo_similar(titulo, titulos_existentes, umbral=SIMILITUD_MINIMA):
     """Comprueba si el título es similar a alguno ya procesado."""
     titulo_norm = normalizar_texto(titulo)
     for t in titulos_existentes:
@@ -490,9 +490,9 @@ def main():
         if not es_relevante(item["titulo"], item["descripcion"]):
             continue
         # DETECTAR DUPLICADOS SIMILARES
-        similar, titulo_similar, ratio = titulo_similar(item["titulo"], titulos_procesados)
+        similar, titulo_sim, ratio = comprobar_titulo_similar(item["titulo"], titulos_procesados)
         if similar:
-            log("   ⏭ Saltado (similar a: " + titulo_similar + ", ratio=" + str(round(ratio, 2)) + ")")
+            log("   ⏭ Saltado (similar a: " + titulo_sim + ", ratio=" + str(round(ratio, 2)) + ")")
             continue
         candidatas.append({**item, "id": noticia_id})
 
