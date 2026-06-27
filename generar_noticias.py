@@ -111,8 +111,13 @@ def obtener_feed(url):
 
 def cargar_estado():
     if ESTADO_FILE.exists():
-        with open(ESTADO_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(ESTADO_FILE, "r", encoding="utf-8") as f:
+                contenido = f.read().strip()
+                if contenido:
+                    return json.loads(contenido)
+        except (json.JSONDecodeError, ValueError):
+            log("⚠️ estado_noticias.json corrupto, iniciando desde cero")
     return {"procesados": [], "ultima_ejecucion": None, "extractos": {}}
 
 def guardar_estado(estado):
@@ -484,6 +489,10 @@ def main():
     log("Listo! Se generaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
     for s in nuevas_slugs:
         log("   → noticias/" + s)
+
+if __name__ == "__main__":
+    main()
+
 
 if __name__ == "__main__":
     main()
