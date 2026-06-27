@@ -15,22 +15,15 @@ from openai import OpenAI
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-REEMPLAZA-ESTO-CON-TU-API-KEY")
 
-# Más fuentes RSS (algunas pueden fallar en PythonAnywhere, pero en GitHub Actions funcionan)
 FEEDS = [
-    # Google News (funciona siempre)
     "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
     "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
     "https://news.google.com/rss/search?q=TikTok+monetizacion&hl=es&gl=ES&ceid=ES:es",
     "https://news.google.com/rss/search?q=TikTok+creadores&hl=es&gl=ES&ceid=ES:es",
-    # 20 Minutos (español)
     "https://www.20minutos.es/rss/tecnologia/",
-    # Tubefilter (inglés - TikTok/YouTube)
     "https://feeds.feedburner.com/tubefilterNews",
-    # Social Media Today (inglés)
     "https://www.socialmediatoday.com/rss.xml",
-    # TechCrunch Social (inglés)
     "https://techcrunch.com/category/social/feed/",
-    # The Guardian TikTok (inglés)
     "https://www.theguardian.com/technology/tiktok/rss",
 ]
 
@@ -133,13 +126,27 @@ def generar_slug(titulo):
     slug = slug[:60].strip("-")
     return slug + ".html"
 
+def limpiar_contenido_ia(contenido):
+    """Convierte markdown a HTML y limpia URLs largas."""
+    # Convertir **texto** a <strong>texto</strong>
+    contenido = re.sub(r"\*\*(.+?)\*\*", r"<strong></strong>", contenido)
+    # Convertir *texto* a <em>texto</em>
+    contenido = re.sub(r"(?<!\*)\*(.+?)\*(?!\*)", r"<em></em>", contenido)
+    # Convertir URLs sueltas en texto a links limpios
+    def link_replacer(match):
+        url = match.group(1)
+        if len(url) > 60:
+            return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">Ver fuente</a>'
+        return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>'
+    contenido = re.sub(r"(https?://[^\s<>"]+)", link_replacer, contenido)
+    # Eliminar líneas que empiecen con "--- Fuente original:" o similares
+    contenido = re.sub(r"<p>\s*---+\s*Fuente original:.*?</p>", "", contenido, flags=re.DOTALL)
+    contenido = re.sub(r"---+\s*Fuente original:.*", "", contenido, flags=re.DOTALL)
+    return contenido.strip()
+
 def generar_extracto(contenido_html, max_chars=140):
-    """Extrae un resumen corto del contenido HTML para la card."""
-    # Quitar tags HTML
     texto = re.sub(r"<[^>]+>", "", contenido_html)
-    # Quitar saltos de línea extra
     texto = re.sub(r"\s+", " ", texto).strip()
-    # Cortar a max_chars
     if len(texto) > max_chars:
         texto = texto[:max_chars].rsplit(" ", 1)[0] + "..."
     return texto
@@ -159,22 +166,23 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         "2. Subtitulo o entradilla (1-2 frases)\n"
         "3. 3-4 parrafos de desarrollo\n"
         "4. Conclusion con implicacion para creadores de contenido\n"
-        "5. Separador --- y la linea: Fuente original: [URL]\n\n"
-        "REGLAS:\n"
+        "5. NO incluyas la fuente original ni URLs en el contenido. Eso se añade automaticamente despues.\n\n"
+        "REGLAS IMPORTANTES:\n"
+        "- Usa SOLO HTML para negritas: <strong>texto</strong> (NO uses ** ni markdown)\n"
+        "- Usa <p> para cada parrafo\n"
+        "- NO incluyas URLs largas en el texto\n"
+        "- NO escribas "Fuente original" al final\n"
         "- Tono profesional, directo y util para creadores de TikTok\n"
-        "- Usa negritas para palabras clave importantes\n"
-        "- No inventes datos que no esten en la noticia original\n"
-        "- Si la noticia esta en ingles, traduce y adapta al espanol\n"
-        "- Incluye siempre la atribucion a la fuente original\n\n"
+        "- Si la noticia esta en ingles, traduce y adapta al espanol\n\n"
         "Responde UNICAMENTE en este formato exacto:\n"
         "TITULO: <titulo aqui>\n"
-        "CONTENIDO: <contenido HTML aqui (parrafos con <p>, negritas con <strong>)>"
+        "CONTENIDO: <contenido HTML aqui (solo <p> y <strong>)>"
     )
     try:
         respuesta = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Eres un editor de noticias especializado en TikTok y redes sociales. Escribes en espanol perfecto."},
+                {"role": "system", "content": "Eres un editor de noticias especializado en TikTok y redes sociales. Escribes en espanol perfecto. Usas SOLO HTML, nunca markdown."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -185,10 +193,12 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         contenido_match = re.search(r"CONTENIDO:\s*(.+)", texto, re.DOTALL)
         nuevo_titulo = titulo_match.group(1).strip() if titulo_match else titulo
         contenido = contenido_match.group(1).strip() if contenido_match else texto
+        # Limpiar markdown residual
+        contenido = limpiar_contenido_ia(contenido)
         return nuevo_titulo, contenido
     except Exception as e:
         log("Error con OpenAI: " + str(e))
-        contenido_fallback = "<p>" + descripcion + "</p><p><strong>Fuente original:</strong> <a href=\"" + url_fuente + "\" target=\"_blank\">" + url_fuente + "</a></p>"
+        contenido_fallback = "<p>" + descripcion + "</p>"
         return titulo, contenido_fallback
 
 def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
@@ -453,7 +463,6 @@ def main():
             slug
         )
         procesados.add(noticia["id"])
-        # Generar extracto real del contenido
         extracto = generar_extracto(contenido_ia)
         extractos[slug] = extracto
         nuevas_slugs.append(slug)
@@ -472,4 +481,6 @@ def main():
         log("   → noticias/" + s)
 
 if __name__ == "__main__":
+    main()
+
     main()
