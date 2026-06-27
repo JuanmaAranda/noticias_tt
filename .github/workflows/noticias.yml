@@ -32,7 +32,7 @@ jobs:
     - name: Deploy vía FTP a Hostinger
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
-        server: ftp.tikpanel.app
+        server: 82.29.185.65
         username: u208113460.github
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./
