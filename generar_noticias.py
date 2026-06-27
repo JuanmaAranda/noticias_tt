@@ -13,24 +13,35 @@ import xml.etree.ElementTree as ET
 import requests
 from openai import OpenAI
 
-# ============================================================
-# CONFIGURACIÓN
-# ============================================================
-
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-REEMPLAZA-ESTO-CON-TU-API-KEY")
 
+# Más fuentes RSS (algunas pueden fallar en PythonAnywhere, pero en GitHub Actions funcionan)
 FEEDS = [
+    # Google News (funciona siempre)
     "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
     "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
     "https://news.google.com/rss/search?q=TikTok+monetizacion&hl=es&gl=ES&ceid=ES:es",
     "https://news.google.com/rss/search?q=TikTok+creadores&hl=es&gl=ES&ceid=ES:es",
+    # 20 Minutos (español)
+    "https://www.20minutos.es/rss/tecnologia/",
+    # Tubefilter (inglés - TikTok/YouTube)
+    "https://feeds.feedburner.com/tubefilterNews",
+    # Social Media Today (inglés)
+    "https://www.socialmediatoday.com/rss.xml",
+    # TechCrunch Social (inglés)
+    "https://techcrunch.com/category/social/feed/",
+    # The Guardian TikTok (inglés)
+    "https://www.theguardian.com/technology/tiktok/rss",
 ]
 
 KEYWORDS = [
     "tiktok", "tik tok", "bytedance", "algorithm", "algoritmo",
     "creator", "creador", "monetization", "monetizacion", "shop",
     "live", "en directo", "ban", "prohibicion", "regulation", "regulacion",
-    "update", "actualizacion", "feature", "funcion", "trend", "tendencia"
+    "update", "actualizacion", "feature", "funcion", "trend", "tendencia",
+    "shorts", "reels", "viral", "viralizar", "influencer", "streamer",
+    "contenido", "video", "plataforma", "red social", "social media",
+    "youtube", "instagram", "meta", "byte dance"
 ]
 
 MAX_NOTICIAS_POR_DIA = 2
@@ -39,10 +50,6 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 NOTICIAS_DIR = Path("noticias")
 ESTADO_FILE = Path("estado_noticias.json")
 NOTICIAS_DIR.mkdir(exist_ok=True)
-
-# ============================================================
-# FUNCIONES AUXILIARES
-# ============================================================
 
 def log(msg):
     print("[" + datetime.now().strftime("%H:%M:%S") + "] " + msg)
@@ -113,7 +120,7 @@ def cargar_estado():
     if ESTADO_FILE.exists():
         with open(ESTADO_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"procesados": [], "ultima_ejecucion": None}
+    return {"procesados": [], "ultima_ejecucion": None, "extractos": {}}
 
 def guardar_estado(estado):
     with open(ESTADO_FILE, "w", encoding="utf-8") as f:
@@ -126,9 +133,16 @@ def generar_slug(titulo):
     slug = slug[:60].strip("-")
     return slug + ".html"
 
-# ============================================================
-# GENERAR ARTÍCULO CON IA
-# ============================================================
+def generar_extracto(contenido_html, max_chars=140):
+    """Extrae un resumen corto del contenido HTML para la card."""
+    # Quitar tags HTML
+    texto = re.sub(r"<[^>]+>", "", contenido_html)
+    # Quitar saltos de línea extra
+    texto = re.sub(r"\s+", " ", texto).strip()
+    # Cortar a max_chars
+    if len(texto) > max_chars:
+        texto = texto[:max_chars].rsplit(" ", 1)[0] + "..."
+    return texto
 
 def generar_articulo_ia(titulo, descripcion, url_fuente):
     prompt = (
@@ -177,10 +191,6 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         contenido_fallback = "<p>" + descripcion + "</p><p><strong>Fuente original:</strong> <a href=\"" + url_fuente + "\" target=\"_blank\">" + url_fuente + "</a></p>"
         return titulo, contenido_fallback
 
-# ============================================================
-# CREAR HTML - ESTRUCTURA IDÉNTICA AL BLOG
-# ============================================================
-
 def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
     fecha_formateada = fecha.strftime("%d de %B de %Y") if fecha else datetime.now().strftime("%d de %B de %Y")
     anio = datetime.now().year
@@ -197,10 +207,8 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         "</head>\n"
         "<body>\n"
         "\n"
-        "    <!-- Navbar (inyectado por shared-components.js) -->\n"
         "    <div id=\"navbar-container\"></div>\n"
         "\n"
-        "    <!-- Breadcrumb -->\n"
         "    <div class=\"blog-breadcrumb\">\n"
         "        <div class=\"container\">\n"
         "            <nav aria-label=\"Breadcrumb\">\n"
@@ -243,7 +251,7 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         "                    " + contenido + "\n"
         "                    <div class=\"info-box warning\" style=\"margin-top: 2rem;\">\n"
         "                        <span class=\"box-title\">⚠️ Aviso importante</span>\n"
-        "                        <p>Este articulo es un <strong>resumen generado automaticamente por IA</strong> a partir de noticias publicas. La informacion original proviene de: <a href=\"" + url_fuente + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + url_fuente + "</a></p>\n"
+        "                        <p>Este articulo es un <strong>resumen generado automaticamente por IA</strong> a partir de noticias publicas. La informacion original proviene de: <a href=\"" + url_fuente + "\" target=\"_blank\" rel=\"noopener noreferrer\">Ver fuente original</a></p>\n"
         "                    </div>\n"
         "                </section>\n"
         "\n"
@@ -265,7 +273,6 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         "        </div>\n"
         "    </main>\n"
         "\n"
-        "    <!-- Footer (inyectado por shared-components.js) -->\n"
         "    <div id=\"footer-container\"></div>\n"
         "\n"
         "    <script src=\"../shared-components.js\"></script>\n"
@@ -278,13 +285,14 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         f.write(html)
     return archivo.name
 
-def actualizar_index():
+def actualizar_index(extractos):
     entradas = []
     for f in sorted(NOTICIAS_DIR.glob("*.html")):
         if f.name == "index.html":
             continue
         fecha_obj = datetime.fromtimestamp(f.stat().st_mtime)
         titulo = "Noticia"
+        extracto = extractos.get(f.name, "Resumen de la noticia sobre TikTok. Haz clic para leer el articulo completo.")
         try:
             with open(f, "r", encoding="utf-8") as file:
                 html = file.read()
@@ -298,6 +306,7 @@ def actualizar_index():
             "titulo": titulo,
             "fecha": fecha_obj,
             "fecha_str": fecha_obj.strftime("%d %b %Y"),
+            "extracto": extracto,
         })
     entradas.sort(key=lambda x: x["fecha"], reverse=True)
     
@@ -313,7 +322,7 @@ def actualizar_index():
             "        <h2 class=\"blog-card-title\">\n"
             "            <a href=\"" + e["archivo"] + "\">" + e["titulo"] + "</a>\n"
             "        </h2>\n"
-            "        <p class=\"blog-card-excerpt\">Resumen de la noticia sobre TikTok. Haz clic para leer el articulo completo.</p>\n"
+            "        <p class=\"blog-card-excerpt\">" + e["extracto"] + "</p>\n"
             "        <a href=\"" + e["archivo"] + "\" class=\"blog-card-cta\">\n"
             "            Leer mas\n"
             "            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg>\n"
@@ -335,10 +344,8 @@ def actualizar_index():
         "</head>\n"
         "<body>\n"
         "\n"
-        "    <!-- Navbar (inyectado por shared-components.js) -->\n"
         "    <div id=\"navbar-container\"></div>\n"
         "\n"
-        "    <!-- Hero -->\n"
         "    <section class=\"blog-hero\">\n"
         "        <div class=\"blog-hero-bg\">\n"
         "            <div class=\"hero-orb-1\"></div>\n"
@@ -357,7 +364,6 @@ def actualizar_index():
         "        </div>\n"
         "    </section>\n"
         "\n"
-        "    <!-- Grid -->\n"
         "    <main class=\"blog-section\">\n"
         "        <div class=\"container\">\n"
         "            <div class=\"blog-grid\">\n"
@@ -366,7 +372,6 @@ def actualizar_index():
         "        </div>\n"
         "    </main>\n"
         "\n"
-        "    <!-- CTA Section -->\n"
         "    <section class=\"blog-cta-section\">\n"
         "        <div class=\"container\">\n"
         "            <div class=\"blog-cta-card\">\n"
@@ -385,7 +390,6 @@ def actualizar_index():
         "        </div>\n"
         "    </section>\n"
         "\n"
-        "    <!-- Footer (inyectado por shared-components.js) -->\n"
         "    <div id=\"footer-container\"></div>\n"
         "\n"
         "    <script src=\"../shared-components.js\"></script>\n"
@@ -396,16 +400,13 @@ def actualizar_index():
     with open(NOTICIAS_DIR / "index.html", "w", encoding="utf-8") as f:
         f.write(html)
 
-# ============================================================
-# MAIN
-# ============================================================
-
 def main():
     log("Iniciando generacion de noticias automaticas...")
     log("Fecha: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     
     estado = cargar_estado()
     procesados = set(estado.get("procesados", []))
+    extractos = estado.get("extractos", {})
     
     todas_noticias = []
     for feed_url in FEEDS:
@@ -452,13 +453,17 @@ def main():
             slug
         )
         procesados.add(noticia["id"])
+        # Generar extracto real del contenido
+        extracto = generar_extracto(contenido_ia)
+        extractos[slug] = extracto
         nuevas_slugs.append(slug)
         log("Guardado: noticias/" + slug)
     
     log("Actualizando indice de noticias...")
-    actualizar_index()
+    actualizar_index(extractos)
     
     estado["procesados"] = list(procesados)
+    estado["extractos"] = extractos
     estado["ultima_ejecucion"] = ahora.isoformat()
     guardar_estado(estado)
     
@@ -468,5 +473,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
