@@ -498,36 +498,37 @@ def main():
 
     log(str(len(candidatas)) + " noticias candidatas tras filtrar")
 
-    if not candidatas:
-        log("No hay noticias nuevas relevantes hoy. Saliendo.")
-        guardar_estado(estado)
-        return
-
-    a_procesar = candidatas[:MAX_NOTICIAS_POR_DIA]
     nuevas_slugs = []
 
-    for noticia in a_procesar:
-        log("Procesando: " + noticia["titulo"][:80] + "...")
-        titulo_ia, contenido_ia = generar_articulo_ia(
-            noticia["titulo"],
-            noticia["descripcion"],
-            noticia["url"]
-        )
-        slug = generar_slug(titulo_ia)
-        crear_html_noticia(
-            titulo_ia,
-            contenido_ia,
-            noticia["url"],
-            noticia["fecha"] or datetime.now(),
-            slug
-        )
-        procesados.add(noticia["id"])
-        extracto = generar_extracto(contenido_ia)
-        extractos[slug] = extracto
-        titulos_procesados.append(titulo_ia)
-        nuevas_slugs.append(slug)
-        log("Guardado: noticias/" + slug)
+    if candidatas:
+        a_procesar = candidatas[:MAX_NOTICIAS_POR_DIA]
 
+        for noticia in a_procesar:
+            log("Procesando: " + noticia["titulo"][:80] + "...")
+            titulo_ia, contenido_ia = generar_articulo_ia(
+                noticia["titulo"],
+                noticia["descripcion"],
+                noticia["url"]
+            )
+            slug = generar_slug(titulo_ia)
+            crear_html_noticia(
+                titulo_ia,
+                contenido_ia,
+                noticia["url"],
+                noticia["fecha"] or datetime.now(),
+                slug
+            )
+            procesados.add(noticia["id"])
+            extracto = generar_extracto(contenido_ia)
+            extractos[slug] = extracto
+            titulos_procesados.append(titulo_ia)
+            nuevas_slugs.append(slug)
+            log("Guardado: noticias/" + slug)
+    else:
+        log("No hay noticias nuevas. Solo se regenera el indice.")
+
+    # SIEMPRE regenerar el index, incluso si no hay noticias nuevas
+    # (asi se eliminan del indice los articulos borrados manualmente)
     log("Actualizando indice de noticias...")
     actualizar_index(extractos)
 
@@ -537,9 +538,12 @@ def main():
     estado["ultima_ejecucion"] = ahora.isoformat()
     guardar_estado(estado)
 
-    log("Listo! Se generaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
-    for s in nuevas_slugs:
-        log("   → noticias/" + s)
+    if nuevas_slugs:
+        log("Listo! Se generaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
+        for s in nuevas_slugs:
+            log("   → noticias/" + s)
+    else:
+        log("Indice regenerado. No hay noticias nuevas.")
 
 if __name__ == "__main__":
     main()
