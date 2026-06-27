@@ -126,20 +126,24 @@ def generar_slug(titulo):
     slug = slug[:60].strip("-")
     return slug + ".html"
 
-def limpiar_contenido_ia(contenido):
-    """Convierte markdown a HTML y limpia URLs largas."""
-    # Convertir **texto** a <strong>texto</strong>
-    contenido = re.sub(r"\*\*(.+?)\*\*", r"<strong></strong>", contenido)
-    # Convertir *texto* a <em>texto</em>
-    contenido = re.sub(r"(?<!\*)\*(.+?)\*(?!\*)", r"<em></em>", contenido)
-    # Convertir URLs sueltas en texto a links limpios
+def limpiar_markdown(contenido):
+    """Convierte markdown residual a HTML."""
+    contenido = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", contenido)
+    contenido = re.sub(r"(?<!\*)\*(.+?)\*(?!\*)", r"<em>\1</em>", contenido)
+    return contenido
+
+def limpiar_urls(contenido):
+    """Convierte URLs sueltas a links cortos."""
+    patron = re.compile(r"(https?://[^\s<>]+)")
     def link_replacer(match):
         url = match.group(1)
         if len(url) > 60:
             return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">Ver fuente</a>'
         return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>'
-    contenido = re.sub(r'(https?://[^\s<>"]+)', link_replacer, contenido)
-    # Eliminar líneas que empiecen con "--- Fuente original:" o similares
+    return patron.sub(link_replacer, contenido)
+
+def limpiar_fuentes(contenido):
+    """Elimina lineas de fuente original del contenido."""
     contenido = re.sub(r"<p>\s*---+\s*Fuente original:.*?</p>", "", contenido, flags=re.DOTALL)
     contenido = re.sub(r"---+\s*Fuente original:.*", "", contenido, flags=re.DOTALL)
     return contenido.strip()
@@ -171,7 +175,7 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         "- Usa SOLO HTML para negritas: <strong>texto</strong> (NO uses ** ni markdown)\n"
         "- Usa <p> para cada parrafo\n"
         "- NO incluyas URLs largas en el texto\n"
-        "- NO escribas "Fuente original" al final\n"
+        "- NO escribas 'Fuente original' al final\n"
         "- Tono profesional, directo y util para creadores de TikTok\n"
         "- Si la noticia esta en ingles, traduce y adapta al espanol\n\n"
         "Responde UNICAMENTE en este formato exacto:\n"
@@ -193,8 +197,9 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         contenido_match = re.search(r"CONTENIDO:\s*(.+)", texto, re.DOTALL)
         nuevo_titulo = titulo_match.group(1).strip() if titulo_match else titulo
         contenido = contenido_match.group(1).strip() if contenido_match else texto
-        # Limpiar markdown residual
-        contenido = limpiar_contenido_ia(contenido)
+        contenido = limpiar_markdown(contenido)
+        contenido = limpiar_urls(contenido)
+        contenido = limpiar_fuentes(contenido)
         return nuevo_titulo, contenido
     except Exception as e:
         log("Error con OpenAI: " + str(e))
@@ -204,7 +209,7 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
 def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
     fecha_formateada = fecha.strftime("%d de %B de %Y") if fecha else datetime.now().strftime("%d de %B de %Y")
     anio = datetime.now().year
-    
+
     html = (
         "<!DOCTYPE html>\n"
         "<html lang=\"es\">\n"
@@ -289,7 +294,7 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         "</body>\n"
         "</html>"
     )
-    
+
     archivo = NOTICIAS_DIR / slug
     with open(archivo, "w", encoding="utf-8") as f:
         f.write(html)
@@ -319,7 +324,7 @@ def actualizar_index(extractos):
             "extracto": extracto,
         })
     entradas.sort(key=lambda x: x["fecha"], reverse=True)
-    
+
     items_html = ""
     for e in entradas[:30]:
         items_html += (
@@ -340,7 +345,7 @@ def actualizar_index(extractos):
             "    </div>\n"
             "</article>\n"
         )
-    
+
     anio = datetime.now().year
     html = (
         "<!DOCTYPE html>\n"
@@ -406,25 +411,25 @@ def actualizar_index(extractos):
         "</body>\n"
         "</html>"
     )
-    
+
     with open(NOTICIAS_DIR / "index.html", "w", encoding="utf-8") as f:
         f.write(html)
 
 def main():
     log("Iniciando generacion de noticias automaticas...")
     log("Fecha: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    
+
     estado = cargar_estado()
     procesados = set(estado.get("procesados", []))
     extractos = estado.get("extractos", {})
-    
+
     todas_noticias = []
     for feed_url in FEEDS:
         log("Leyendo feed: " + feed_url)
         items = obtener_feed(feed_url)
         log("   → " + str(len(items)) + " articulos encontrados")
         todas_noticias.extend(items)
-    
+
     ahora = datetime.now()
     limite = ahora - timedelta(hours=48)
     candidatas = []
@@ -437,16 +442,16 @@ def main():
         if not es_relevante(item["titulo"], item["descripcion"]):
             continue
         candidatas.append({**item, "id": noticia_id})
-    
+
     log(str(len(candidatas)) + " noticias candidatas tras filtrar")
-    
+
     if not candidatas:
         log("No hay noticias nuevas relevantes hoy. Saliendo.")
         return
-    
+
     a_procesar = candidatas[:MAX_NOTICIAS_POR_DIA]
     nuevas_slugs = []
-    
+
     for noticia in a_procesar:
         log("Procesando: " + noticia["titulo"][:80] + "...")
         titulo_ia, contenido_ia = generar_articulo_ia(
@@ -467,15 +472,15 @@ def main():
         extractos[slug] = extracto
         nuevas_slugs.append(slug)
         log("Guardado: noticias/" + slug)
-    
+
     log("Actualizando indice de noticias...")
     actualizar_index(extractos)
-    
+
     estado["procesados"] = list(procesados)
     estado["extractos"] = extractos
     estado["ultima_ejecucion"] = ahora.isoformat()
     guardar_estado(estado)
-    
+
     log("Listo! Se generaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
     for s in nuevas_slugs:
         log("   → noticias/" + s)
@@ -483,4 +488,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-    main()
