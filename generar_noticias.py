@@ -25,7 +25,7 @@ FTP_USER = "u208113460.github"
 FTP_PASS = "3Kk:~+eR;V*"
 
 REMOTE_DIR = "/noticias"
-LOCAL_DIR = Path.home() / "tikpanel-noticias"
+LOCAL_DIR = Path(".")
 
 # Nota: PythonAnywhere gratuito bloquea algunos dominios.
 # Solo Google News RSS funciona seguro. Usamos varias queries.
