@@ -1,25 +1,27 @@
 {
   "procesados": [
     "004a40b5858d7cb3afbc4f72b1fc0f9f",
-    "c5cf749c9eef427109dce529c55d93ba",
-    "2d2c6abfabbe8b134a354f97fe726698",
-    "f0539f85204b7ccbe754b410f491cc99",
-    "c80a6f697823b31edd74f5335c26422d",
-    "4a5f3a5e420d768f38fc9bff939fd201",
-    "b58b2f0ada79cdf6a488dfe8bf480263",
-    "26d4862d078b2183e876e3a376311b4e",
-    "f08e550f6b260fe90426d2118f745a2b",
-    "20e5a3829de2b007b308f310d15b0129",
-    "63dbb6423eb9319904fb068399b5d01c",
-    "adde1737960005d43941772e10921c32",
-    "2263da38c7cc8908711e811cc8176520",
-    "00aa5b77f36a141bc3b7528eb328c669",
-    "8bbebdd4dbd48e8e5514ed81d4f7b83b",
-    "9be2abfa55705fb9ee55efe70d5c212a",
     "80d03071b5e1b30ac04b0639736ccd0d",
-    "f8c391263444121152a78cb04d72787d"
+    "8bbebdd4dbd48e8e5514ed81d4f7b83b",
+    "adde1737960005d43941772e10921c32",
+    "8c86b903dc1cacd23a65cbf077ded719",
+    "20e5a3829de2b007b308f310d15b0129",
+    "00aa5b77f36a141bc3b7528eb328c669",
+    "4a5f3a5e420d768f38fc9bff939fd201",
+    "f8c391263444121152a78cb04d72787d",
+    "1db6c8d3bb9ed92bc295f791b6b1e491",
+    "f08e550f6b260fe90426d2118f745a2b",
+    "c80a6f697823b31edd74f5335c26422d",
+    "2263da38c7cc8908711e811cc8176520",
+    "9be2abfa55705fb9ee55efe70d5c212a",
+    "c5cf749c9eef427109dce529c55d93ba",
+    "26d4862d078b2183e876e3a376311b4e",
+    "63dbb6423eb9319904fb068399b5d01c",
+    "f0539f85204b7ccbe754b410f491cc99",
+    "b58b2f0ada79cdf6a488dfe8bf480263",
+    "2d2c6abfabbe8b134a354f97fe726698"
   ],
-  "ultima_ejecucion": "2026-06-28T18:04:29.972460",
+  "ultima_ejecucion": "2026-06-28T18:40:40.115867",
   "extractos": {
     "mujer-compra-casa-en-italia-por-1-euro-y-se-vuelve-viral-en.html": "Una mujer ha captado la atención de millones de usuarios en TikTok tras compartir su increíble experiencia al comprar una casa en Italia...",
     "la-favela-brasileña-que-transformó-armas-en-tecnología-viral.html": "En un giro sorprendente, una favela de Brasil, anteriormente conocida como epicentro de actividades delictivas, ha dado un paso hacia la...",
@@ -35,10 +37,13 @@
     "la-fiebre-del-queso-cottage-en-tiktok-complica-a-mercadona-y.html": "La popularidad del queso cottage ha alcanzado niveles inesperados gracias a TikTok, generando un impacto significativo en la industria...",
     "cómo-el-algoritmo-de-tiktok-afecta-tu-contenido-y-cómo-recup.html": "El algoritmo de TikTok influye significativamente en la experiencia de los usuarios al decidir qué contenido se muestra en sus feeds. Según...",
     "el-impacto-de-tiktok-en-la-cultura-digital-en-españa-análisi.html": "Según un artículo de Atalayar, TikTok ha transformado la cultura digital en España, convirtiéndose en una de las plataformas más...",
-    "tiktok-y-sus-vídeos-de-terror-los-contenidos-perturbadores-o.html": "La plataforma TikTok ha sido objeto de críticas por la aparición de vídeos de terror que muchos consideran perturbadores. Según un artículo..."
+    "tiktok-y-sus-vídeos-de-terror-los-contenidos-perturbadores-o.html": "La plataforma TikTok ha sido objeto de críticas por la aparición de vídeos de terror que muchos consideran perturbadores. Según un artículo...",
+    "casi-el-60-de-los-vídeos-en-tiktok-para-nuevos-usuarios-son.html": "Un reciente estudio revela que casi el 60% de los vídeos que TikTok presenta a nuevos usuarios y niños son generados mediante inteligencia...",
+    "tiktok-impulsa-el-flamenco-entre-los-jóvenes-en-sevilla.html": "La plataforma TikTok ha jugado un papel significativo en la revitalización del flamenco entre las nuevas generaciones. Según un artículo de..."
   },
   "titulos": [
     "Cómo el algoritmo de TikTok afecta tu contenido y cómo recuperas el control",
+    "El impacto de TikTok en la cultura digital en España: análisis y cifras",
     "Indonesia desactiva casi 5 millones de cuentas en TikTok y YouTube",
     "Influencer Yass Naubelle condenada a prisión en Marruecos por críticas a la policía",
     "La favela brasileña que transformó armas en tecnología viral",
@@ -50,10 +55,11 @@
     "OKDIARIO supera los 2 millones de seguidores en TikTok y se posiciona en España",
     "TikTok de Euronews: Voz para las víctimas del terremoto en Venezuela",
     "TikTok e Instagram transforman las decisiones de compra de los consumidores",
+    "TikTok y sus vídeos de terror: los contenidos perturbadores ocultos",
     "Tiktoker británica en riesgo de ejecución por homicidio en Dubái",
     "Viral en TikTok: Cliente casado pierde a su asesora tras un mensaje",
     "YouTube lanza nuevas funciones en Shorts para competir con TikTok",
-    "El impacto de TikTok en la cultura digital en España: análisis y cifras",
-    "TikTok y sus vídeos de terror: los contenidos perturbadores ocultos"
+    "Casi el 60% de los vídeos en TikTok para nuevos usuarios son generados por IA",
+    "TikTok impulsa el flamenco entre los jóvenes en Sevilla"
   ]
 }
