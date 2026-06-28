@@ -28,6 +28,44 @@ if (!defined('OPENAI_API_KEY')) {
 // Ruta a la carpeta de noticias (relativa a este archivo)
 $NOTICIAS_DIR = dirname(__DIR__) . '/noticias/';
 $BORRADAS_FILE = __DIR__ . '/borradas.txt';
+$FEEDS_FILE = __DIR__ . '/feeds.json';
+
+// ============================================================
+// GESTIÓN DE FEEDS RSS
+// ============================================================
+
+function cargar_feeds() {
+    global $FEEDS_FILE;
+    $feeds_default = [
+        "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+monetizacion&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+creadores&hl=es&gl=ES&ceid=ES:es",
+        "https://www.20minutos.es/rss/tecnologia/",
+        "https://feeds.feedburner.com/tubefilterNews",
+        "https://www.socialmediatoday.com/rss.xml",
+        "https://techcrunch.com/category/social/feed/",
+        "https://www.theguardian.com/technology/tiktok/rss"
+    ];
+    
+    if (file_exists($FEEDS_FILE)) {
+        try {
+            $contenido = file_get_contents($FEEDS_FILE);
+            $feeds = json_decode($contenido, true);
+            if (is_array($feeds) && count($feeds) > 0) {
+                return $feeds;
+            }
+        } catch (Exception $e) {
+            // Si hay error, usar defaults
+        }
+    }
+    return $feeds_default;
+}
+
+function guardar_feeds($feeds) {
+    global $FEEDS_FILE;
+    file_put_contents($FEEDS_FILE, json_encode(array_values($feeds), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
+}
 
 // ============================================================
 // AUTENTICACIÓN
@@ -81,6 +119,7 @@ function parsear_info_noticia($archivo_path) {
         'fecha_str' => '',
         'extracto' => '',
         'contenido' => '',
+        'contenido_plano' => '',
         'url_fuente' => '',
     ];
 
@@ -98,9 +137,30 @@ function parsear_info_noticia($archivo_path) {
     }
     if (preg_match('/<section class="article-body-content">(.*?)<div class="info-box warning"/s', $html, $m)) {
         $contenido = trim($m[1]);
+        // Quitar el párrafo de resumen si existe
         $contenido = preg_replace('/<p>Resumen informativo de actualidad.*?<\/p>/i', '', $contenido);
+        // Quitar párrafos vacíos al inicio y final
+        $contenido = preg_replace('/^(\s*<p>\s*<\/p>\s*)+/i', '', $contenido);
+        $contenido = preg_replace('/(\s*<p>\s*<\/p>\s*)+$/i', '', $contenido);
         $info['contenido'] = trim($contenido);
+        $info['contenido_plano'] = strip_tags(trim($contenido));
         $info['extracto'] = generar_extracto($contenido);
+    } else {
+        // Fallback: intentar capturar todo el body si no encuentra la sección específica
+        if (preg_match('/<body[^>]*>(.*?)<\/body>/s', $html, $m)) {
+            $body = $m[1];
+            // Quitar scripts, nav, footer, etc.
+            $body = preg_replace('/<script.*?<\/script>/s', '', $body);
+            $body = preg_replace('/<nav.*?<\/nav>/s', '', $body);
+            $body = preg_replace('/<footer.*?<\/footer>/s', '', $body);
+            $body = preg_replace('/<div[^>]*id="navbar-container".*?<\/div>/s', '', $body);
+            $body = preg_replace('/<div[^>]*id="footer-container".*?<\/div>/s', '', $body);
+            $body = preg_replace('/<div class="blog-breadcrumb".*?<\/div>/s', '', $body);
+            $body = strip_tags($body, '<p><strong><em><h3><ul><ol><li><a><br>');
+            $info['contenido'] = trim($body);
+            $info['contenido_plano'] = strip_tags(trim($body));
+            $info['extracto'] = generar_extracto($body);
+        }
     }
 
     return $info;
@@ -120,7 +180,7 @@ function listar_noticias() {
 
     foreach (glob($NOTICIAS_DIR . '*.html') as $f) {
         if (basename($f) === 'index.html') continue;
-        if (isset($borradas[basename($f)])) continue; // Saltar borradas
+        if (isset($borradas[basename($f)])) continue;
         $info = parsear_info_noticia($f);
         if ($info) {
             $info['mtime'] = filemtime($f);
@@ -495,11 +555,15 @@ if ($format === 'json') {
             exit;
         }
 
+        // Convertir el contenido del editor visual a HTML
+        // El editor ya envía HTML, pero aseguramos que sea válido
+        $contenido_html = $contenido;
+
         $info = parsear_info_noticia($NOTICIAS_DIR . $archivo);
         $url_fuente = $info['url_fuente'] ?? '';
         $fecha = $info['fecha'] ?? date('Y-m-d');
 
-        crear_html_noticia($titulo, $contenido, $url_fuente, $fecha, $archivo);
+        crear_html_noticia($titulo, $contenido_html, $url_fuente, $fecha, $archivo);
         actualizar_index();
         echo json_encode(['ok' => true, 'mensaje' => 'Noticia actualizada']);
         exit;
@@ -507,7 +571,6 @@ if ($format === 'json') {
 
     if ($action === 'reescribir' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         require_auth();
-        global $OPENAI_API_KEY;
         $OPENAI_API_KEY = defined('OPENAI_API_KEY') ? OPENAI_API_KEY : '';
 
         if (!$OPENAI_API_KEY) {
@@ -543,6 +606,52 @@ if ($format === 'json') {
         actualizar_index();
         echo json_encode(['ok' => true, 'titulo' => $nuevo_titulo, 'archivo' => $archivo]);
         exit;
+    }
+
+    // Acciones para gestionar feeds RSS
+    if ($action === 'listar_feeds') {
+        require_auth();
+        $feeds = cargar_feeds();
+        echo json_encode(['ok' => true, 'feeds' => $feeds]);
+        exit;
+    }
+
+    if ($action === 'agregar_feed' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        require_auth();
+        $data = json_decode(file_get_contents('php://input'), true);
+        $nueva_url = trim($data['url'] ?? '');
+        
+        if (!$nueva_url || !filter_var($nueva_url, FILTER_VALIDATE_URL)) {
+            echo json_encode(['error' => 'URL no válida']);
+            exit;
+        }
+        
+        $feeds = cargar_feeds();
+        if (in_array($nueva_url, $feeds)) {
+            echo json_encode(['error' => 'Esta fuente ya existe']);
+            exit;
+        }
+        
+        $feeds[] = $nueva_url;
+        guardar_feeds($feeds);
+        echo json_encode(['ok' => true, 'mensaje' => 'Fuente añadida', 'feeds' => $feeds]);
+        exit;
+    }
+
+    if ($action === 'eliminar_feed' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        require_auth();
+        $data = json_decode(file_get_contents('php://input'), true);
+        $url = trim($data['url'] ?? '');
+        
+        $feeds = cargar_feeds();
+        $feeds = array_values(array_filter($feeds, function($f) use ($url) {
+            return $f !== $url;
+        }));
+        
+        guardar_feeds($feeds);
+        echo json_encode(['ok' => true, 'mensaje' => 'Fuente eliminada', 'feeds' => $feeds]);
+        exit;
+    }
     }
 
     echo json_encode(['error' => 'Acción no válida']);
@@ -721,18 +830,32 @@ $total = count($noticias);
         .btn-view { background: rgba(0,242,234,0.1); border-color: rgba(0,242,234,0.3); color: var(--accent2); }
         .btn-edit { background: rgba(255,165,2,0.1); border-color: rgba(255,165,2,0.3); color: var(--warning); }
         .btn-rewrite { background: rgba(138,43,226,0.1); border-color: rgba(138,43,226,0.3); color: #c084fc; }
-        .status-bar {
-            position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px);
-            background: var(--bg2); border: 1px solid var(--border); padding: 1rem 2rem;
-            border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-            display: flex; align-items: center; gap: 0.8rem; z-index: 200;
-            transition: transform 0.3s ease;
+
+        /* Modal de estado centrada */
+        .status-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px);
+            display: none; align-items: center; justify-content: center; z-index: 400;
         }
-        .status-bar.show { transform: translateX(-50%) translateY(0); }
-        .status-bar.success { border-color: var(--success); }
-        .status-bar.error { border-color: var(--danger); }
-        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .status-modal-overlay.active { display: flex; }
+        .status-modal {
+            background: var(--bg2); border: 1px solid var(--border); border-radius: 20px;
+            padding: 2.5rem; max-width: 400px; width: 90%; text-align: center;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+        }
+        .status-modal .spinner-large {
+            width: 50px; height: 50px; border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent); border-radius: 50%;
+            animation: spin 1s linear infinite; margin: 0 auto 1.5rem;
+        }
+        .status-modal h3 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+        .status-modal p { color: var(--text2); font-size: 0.95rem; }
+        .status-modal.success { border-color: var(--success); }
+        .status-modal.success h3 { color: var(--success); }
+        .status-modal.error { border-color: var(--danger); }
+        .status-modal.error h3 { color: var(--danger); }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Modales generales */
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px);
             display: none; align-items: center; justify-content: center; z-index: 300; padding: 2rem;
@@ -744,15 +867,79 @@ $total = count($noticias);
         .modal-close { background: none; border: none; color: var(--text2); font-size: 1.5rem; cursor: pointer; }
         .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
         .modal-body label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--text2); }
-        .modal-body input, .modal-body textarea { width: 100%; padding: 0.8rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); font-size: 0.95rem; margin-bottom: 1rem; font-family: inherit; }
-        .modal-body textarea { min-height: 300px; resize: vertical; line-height: 1.6; }
+        .modal-body input { width: 100%; padding: 0.8rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); font-size: 0.95rem; margin-bottom: 1rem; font-family: inherit; }
         .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.8rem; }
+        
+        /* Editor visual */
+        .editor-toolbar {
+            display: flex; gap: 0.3rem; padding: 0.5rem;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 10px 10px 0 0; border-bottom: none;
+            flex-wrap: wrap;
+        }
+        .editor-toolbar button {
+            padding: 0.4rem 0.7rem; border: 1px solid var(--border); border-radius: 6px;
+            background: var(--bg2); color: var(--text); font-size: 0.85rem;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .editor-toolbar button:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); }
+        .editor-toolbar button.active { background: rgba(255,0,80,0.2); border-color: var(--accent); }
+        .editor-toolbar .separator { width: 1px; background: var(--border); margin: 0 0.3rem; }
+        #editor {
+            min-height: 350px; padding: 1rem;
+            border: 1px solid var(--border); border-radius: 0 0 10px 10px;
+            background: var(--card); color: var(--text); font-size: 0.95rem;
+            line-height: 1.7; overflow-y: auto;
+        }
+        #editor:focus { outline: none; border-color: var(--accent); }
+        #editor p { margin-bottom: 0.8rem; }
+        #editor strong { color: #fff; }
+        #editor h3 { color: var(--accent2); margin: 1.2rem 0 0.6rem; font-size: 1.15rem; }
+        #editor ul, #editor ol { margin-left: 1.5rem; margin-bottom: 0.8rem; }
+        #editor li { margin-bottom: 0.3rem; }
+        #editor a { color: var(--accent2); }
+        #editor blockquote {
+            border-left: 3px solid var(--accent); padding-left: 1rem;
+            margin: 1rem 0; color: var(--text2); font-style: italic;
+        }
+
         .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text2); }
         .empty-state .icon { font-size: 4rem; margin-bottom: 1rem; opacity: 0.5; }
         .confirm-dialog { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; max-width: 400px; text-align: center; }
         .confirm-dialog h3 { margin-bottom: 1rem; color: var(--danger); }
         .confirm-dialog p { color: var(--text2); margin-bottom: 1.5rem; font-size: 0.95rem; }
         .confirm-dialog .btn-group { display: flex; gap: 0.8rem; justify-content: center; }
+
+        /* Sección de Fuentes RSS */
+        .feeds-section {
+            background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+            padding: 1.5rem; margin-top: 2rem;
+        }
+        .feeds-section h2 {
+            font-size: 1.2rem; margin-bottom: 1rem;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .feeds-list {
+            display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;
+        }
+        .feed-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.7rem 1rem; background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 10px; font-size: 0.9rem;
+        }
+        .feed-item span { color: var(--text2); word-break: break-all; flex: 1; margin-right: 1rem; }
+        .feed-item .btn { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+        .feed-add-form {
+            display: flex; gap: 0.8rem; flex-wrap: wrap;
+        }
+        .feed-add-form input {
+            flex: 1; min-width: 250px; padding: 0.7rem 1rem;
+            border: 1px solid var(--border); border-radius: 10px;
+            background: var(--card); color: var(--text); font-size: 0.9rem;
+        }
+        .feed-add-form input:focus { outline: none; border-color: var(--accent); }
+        .feed-empty { color: var(--text2); text-align: center; padding: 1rem; font-style: italic; }
     </style>
 </head>
 <body>
@@ -785,7 +972,7 @@ $total = count($noticias);
                 <div class="news-card-actions">
                     <a href="../noticias/<?php echo urlencode($noticia['archivo']); ?>" target="_blank" class="btn btn-view">👁 Ver</a>
                     <button class="btn btn-edit" onclick="editNews('<?php echo addslashes($noticia['archivo']); ?>')">✏️ Editar</button>
-                    <button class="btn btn-rewrite" onclick="rewriteNews('<?php echo addslashes($noticia['archivo']); ?>')">🤖 Reescribir IA</button>
+                    <button class="btn btn-rewrite" onclick="confirmRewrite('<?php echo addslashes($noticia['archivo']); ?>', '<?php echo addslashes($noticia['titulo']); ?>')">🤖 Reescribir IA</button>
                     <button class="btn btn-danger" onclick="confirmDelete('<?php echo addslashes($noticia['archivo']); ?>', '<?php echo addslashes($noticia['titulo']); ?>')">🗑 Borrar</button>
                 </div>
             </div>
@@ -798,13 +985,30 @@ $total = count($noticias);
             <p>Ejecuta el script generar_noticias.py para crear nuevas noticias.</p>
         </div>
         <?php endif; ?>
+
+        <!-- Sección de Fuentes RSS -->
+        <div class="feeds-section" id="feedsSection">
+            <h2>📡 Fuentes RSS</h2>
+            <div class="feeds-list" id="feedsList">
+                <div class="feed-empty">Cargando fuentes...</div>
+            </div>
+            <div class="feed-add-form">
+                <input type="url" id="newFeedUrl" placeholder="https://ejemplo.com/rss.xml">
+                <button class="btn btn-primary" onclick="addFeed()">➕ Añadir fuente</button>
+            </div>
+        </div>
     </div>
 
-    <div class="status-bar" id="statusBar">
-        <div class="spinner" id="statusSpinner" style="display:none;"></div>
-        <span id="statusText">Listo</span>
+    <!-- Modal de Estado/Progreso Centrado -->
+    <div class="status-modal-overlay" id="statusModal">
+        <div class="status-modal" id="statusModalContent">
+            <div class="spinner-large" id="statusSpinner"></div>
+            <h3 id="statusTitle">Procesando...</h3>
+            <p id="statusMessage">Por favor espera</p>
+        </div>
     </div>
 
+    <!-- Modal de Editar con Editor Visual -->
     <div class="modal-overlay" id="editModal">
         <div class="modal">
             <div class="modal-header">
@@ -814,8 +1018,20 @@ $total = count($noticias);
             <div class="modal-body">
                 <label for="editTitle">Título</label>
                 <input type="text" id="editTitle">
-                <label for="editContent">Contenido HTML</label>
-                <textarea id="editContent"></textarea>
+                <label>Contenido</label>
+                <div class="editor-toolbar">
+                    <button type="button" onclick="editorFormat('bold')" title="Negrita"><b>B</b></button>
+                    <button type="button" onclick="editorFormat('italic')" title="Cursiva"><i>I</i></button>
+                    <button type="button" onclick="editorFormat('underline')" title="Subrayado"><u>U</u></button>
+                    <div class="separator"></div>
+                    <button type="button" onclick="editorFormat('h3')" title="Subtítulo">H3</button>
+                    <div class="separator"></div>
+                    <button type="button" onclick="editorFormat('insertUnorderedList')" title="Lista">• Lista</button>
+                    <button type="button" onclick="editorFormat('insertOrderedList')" title="Lista numerada">1. Lista</button>
+                    <div class="separator"></div>
+                    <button type="button" onclick="editorFormat('removeFormat')" title="Quitar formato">🧹</button>
+                </div>
+                <div id="editor" contenteditable="true"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn" onclick="closeModal('editModal')">Cancelar</button>
@@ -824,6 +1040,7 @@ $total = count($noticias);
         </div>
     </div>
 
+    <!-- Modal de Confirmar Borrar -->
     <div class="modal-overlay" id="confirmModal">
         <div class="confirm-dialog">
             <h3>🗑 ¿Borrar noticia?</h3>
@@ -835,18 +1052,45 @@ $total = count($noticias);
         </div>
     </div>
 
+    <!-- Modal de Confirmar Reescribir IA -->
+    <div class="modal-overlay" id="rewriteModal">
+        <div class="confirm-dialog">
+            <h3>🤖 ¿Reescribir con IA?</h3>
+            <p id="rewriteText">La IA reescribirá esta noticia completamente. Se mantendrá la misma URL.</p>
+            <div class="btn-group">
+                <button class="btn" onclick="closeModal('rewriteModal')">Cancelar</button>
+                <button class="btn btn-rewrite" onclick="executeRewrite()" style="background: rgba(138,43,226,0.2); color: #c084fc; border-color: rgba(138,43,226,0.4);">Sí, reescribir</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentFile = null;
         let deleteFile = null;
+        let rewriteFile = null;
 
-        function showStatus(msg, type='success', loading=false) {
-            const bar = document.getElementById('statusBar');
-            const text = document.getElementById('statusText');
+        // Modal de estado centrado
+        function showStatus(title, message, type='loading') {
+            const modal = document.getElementById('statusModal');
+            const content = document.getElementById('statusModalContent');
             const spinner = document.getElementById('statusSpinner');
-            text.textContent = msg;
-            bar.className = 'status-bar show ' + type;
-            spinner.style.display = loading ? 'block' : 'none';
-            setTimeout(() => bar.classList.remove('show'), 4000);
+            const titleEl = document.getElementById('statusTitle');
+            const msgEl = document.getElementById('statusMessage');
+            
+            titleEl.textContent = title;
+            msgEl.textContent = message;
+            content.className = 'status-modal ' + (type === 'error' ? 'error' : type === 'success' ? 'success' : '');
+            spinner.style.display = type === 'loading' ? 'block' : 'none';
+            
+            modal.classList.add('active');
+            
+            if (type !== 'loading') {
+                setTimeout(() => modal.classList.remove('active'), 3000);
+            }
+        }
+
+        function hideStatus() {
+            document.getElementById('statusModal').classList.remove('active');
         }
 
         function filterNews() {
@@ -860,30 +1104,58 @@ $total = count($noticias);
         function openModal(id) { document.getElementById(id).classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
+        // Editor visual
+        function editorFormat(command) {
+            document.execCommand(command, false, null);
+            document.getElementById('editor').focus();
+        }
+
         async function editNews(archivo) {
             currentFile = archivo;
-            showStatus('Cargando noticia...', 'success', true);
+            showStatus('Cargando noticia...', 'Por favor espera');
             try {
                 const res = await fetch('?format=json&action=noticia&archivo=' + encodeURIComponent(archivo));
                 const data = await res.json();
                 document.getElementById('editTitle').value = data.titulo || '';
-                document.getElementById('editContent').value = data.contenido || '';
+                
+                // Cargar contenido en el editor visual
+                const editor = document.getElementById('editor');
+                let contenido = data.contenido || '';
+                
+                // Si el contenido está vacío, intentar con contenido_plano
+                if (!contenido && data.contenido_plano) {
+                    contenido = '<p>' + data.contenido_plano.replace(/\n\n/g, '</p><p>') + '</p>';
+                }
+                
+                if (contenido && contenido.trim() !== '') {
+                    editor.innerHTML = contenido;
+                } else {
+                    editor.innerHTML = '<p><br></p>';
+                }
+                
+                hideStatus();
                 openModal('editModal');
-                showStatus('Noticia cargada');
             } catch (e) {
-                showStatus('Error al cargar: ' + e.message, 'error');
+                hideStatus();
+                showStatus('Error', 'No se pudo cargar la noticia: ' + e.message, 'error');
             }
         }
 
         async function saveEdit() {
             if (!currentFile) return;
             const titulo = document.getElementById('editTitle').value.trim();
-            const contenido = document.getElementById('editContent').value.trim();
-            if (!titulo || !contenido) {
-                showStatus('Título y contenido son obligatorios', 'error');
+            const contenido = document.getElementById('editor').innerHTML.trim();
+            
+            if (!titulo) {
+                showStatus('Error', 'El título es obligatorio', 'error');
                 return;
             }
-            showStatus('Guardando...', 'success', true);
+            if (!contenido || contenido === '<p>Escribe el contenido de la noticia aquí...</p>') {
+                showStatus('Error', 'El contenido es obligatorio', 'error');
+                return;
+            }
+            
+            showStatus('Guardando...', 'Por favor espera');
             try {
                 const res = await fetch('?format=json&action=editar&archivo=' + encodeURIComponent(currentFile), {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -891,14 +1163,17 @@ $total = count($noticias);
                 });
                 const data = await res.json();
                 if (data.ok) {
-                    showStatus('Guardado correctamente');
+                    hideStatus();
                     closeModal('editModal');
-                    setTimeout(() => location.reload(), 800);
+                    showStatus('¡Guardado!', 'La noticia se actualizó correctamente', 'success');
+                    setTimeout(() => location.reload(), 1500);
                 } else {
-                    showStatus(data.error || 'Error al guardar', 'error');
+                    hideStatus();
+                    showStatus('Error', data.error || 'Error al guardar', 'error');
                 }
             } catch (e) {
-                showStatus('Error: ' + e.message, 'error');
+                hideStatus();
+                showStatus('Error', e.message, 'error');
             }
         }
 
@@ -911,39 +1186,149 @@ $total = count($noticias);
         async function executeDelete() {
             if (!deleteFile) return;
             closeModal('confirmModal');
-            showStatus('Borrando...', 'success', true);
+            showStatus('Borrando...', 'Por favor espera');
             try {
                 const res = await fetch('?format=json&action=borrar&archivo=' + encodeURIComponent(deleteFile), {method: 'POST'});
                 const data = await res.json();
                 if (data.ok) {
-                    showStatus('Borrado correctamente');
+                    hideStatus();
+                    showStatus('¡Borrado!', 'La noticia se eliminó correctamente', 'success');
                     const card = document.querySelector(`[data-file="${deleteFile}"]`);
                     if (card) card.remove();
                 } else {
-                    showStatus(data.error || 'Error al borrar', 'error');
+                    hideStatus();
+                    showStatus('Error', data.error || 'Error al borrar', 'error');
                 }
             } catch (e) {
-                showStatus('Error: ' + e.message, 'error');
+                hideStatus();
+                showStatus('Error', e.message, 'error');
             }
             deleteFile = null;
         }
 
-        async function rewriteNews(archivo) {
-            if (!confirm('¿Quieres que la IA reescriba esta noticia completamente? Se mantendrá la misma URL.')) return;
-            showStatus('La IA está reescribiendo la noticia...', 'success', true);
+        function confirmRewrite(archivo, titulo) {
+            rewriteFile = archivo;
+            document.getElementById('rewriteText').textContent = `La IA reescribirá "${titulo}" completamente. Se mantendrá la misma URL.`;
+            openModal('rewriteModal');
+        }
+
+        async function executeRewrite() {
+            if (!rewriteFile) return;
+            closeModal('rewriteModal');
+            showStatus('Reescribiendo...', 'La IA está generando el nuevo contenido. Esto puede tardar unos segundos.');
             try {
-                const res = await fetch('?format=json&action=reescribir&archivo=' + encodeURIComponent(archivo), {method: 'POST'});
+                const res = await fetch('?format=json&action=reescribir&archivo=' + encodeURIComponent(rewriteFile), {method: 'POST'});
                 const data = await res.json();
                 if (data.ok) {
-                    showStatus('Reescrita: ' + data.titulo);
-                    setTimeout(() => location.reload(), 1000);
+                    hideStatus();
+                    showStatus('¡Reescrita!', 'La noticia se reescribió correctamente: ' + data.titulo, 'success');
+                    setTimeout(() => location.reload(), 2000);
                 } else {
-                    showStatus(data.error || 'Error al reescribir', 'error');
+                    hideStatus();
+                    showStatus('Error', data.error || 'Error al reescribir', 'error');
                 }
             } catch (e) {
-                showStatus('Error: ' + e.message, 'error');
+                hideStatus();
+                showStatus('Error', e.message, 'error');
+            }
+            rewriteFile = null;
+        }
+        // Cargar feeds al iniciar
+        async function loadFeeds() {
+            try {
+                const res = await fetch('?format=json&action=listar_feeds');
+                const data = await res.json();
+                if (data.ok) {
+                    renderFeeds(data.feeds);
+                }
+            } catch (e) {
+                console.error('Error cargando feeds:', e);
             }
         }
+
+        function renderFeeds(feeds) {
+            const container = document.getElementById('feedsList');
+            if (!feeds || feeds.length === 0) {
+                container.innerHTML = '<div class="feed-empty">No hay fuentes configuradas</div>';
+                return;
+            }
+            container.innerHTML = feeds.map(url => `
+                <div class="feed-item">
+                    <span>${escapeHtml(url)}</span>
+                    <button class="btn btn-danger" onclick="removeFeed('${escapeJs(url)}')">🗑 Eliminar</button>
+                </div>
+            `).join('');
+        }
+
+        async function addFeed() {
+            const input = document.getElementById('newFeedUrl');
+            const url = input.value.trim();
+            
+            if (!url) {
+                showStatus('Error', 'Introduce una URL válida', 'error');
+                return;
+            }
+            
+            showStatus('Añadiendo fuente...', 'Por favor espera');
+            try {
+                const res = await fetch('?format=json&action=agregar_feed', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    input.value = '';
+                    hideStatus();
+                    renderFeeds(data.feeds);
+                    showStatus('¡Añadida!', 'La fuente RSS se añadió correctamente', 'success');
+                } else {
+                    hideStatus();
+                    showStatus('Error', data.error || 'Error al añadir', 'error');
+                }
+            } catch (e) {
+                hideStatus();
+                showStatus('Error', e.message, 'error');
+            }
+        }
+
+        async function removeFeed(url) {
+            if (!confirm('¿Eliminar esta fuente RSS?')) return;
+            
+            showStatus('Eliminando fuente...', 'Por favor espera');
+            try {
+                const res = await fetch('?format=json&action=eliminar_feed', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    hideStatus();
+                    renderFeeds(data.feeds);
+                    showStatus('¡Eliminada!', 'La fuente se eliminó correctamente', 'success');
+                } else {
+                    hideStatus();
+                    showStatus('Error', data.error || 'Error al eliminar', 'error');
+                }
+            } catch (e) {
+                hideStatus();
+                showStatus('Error', e.message, 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeJs(str) {
+            return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        // Cargar feeds al iniciar la página
+        loadFeeds();
     </script>
 </body>
 </html>

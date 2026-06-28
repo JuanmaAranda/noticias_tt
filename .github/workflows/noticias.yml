@@ -28,9 +28,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Descargar lista de borradas desde el servidor
+    - name: Descargar lista de borradas y feeds desde el servidor
       run: |
-        curl -s -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt en el servidor"
+        curl -s -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt"
+        curl -s -o feeds.json "https://tikpanel.app/panel/feeds.json" || echo "No hay feeds.json, usando por defecto"
 
     - name: Ejecutar generador de noticias
       env:

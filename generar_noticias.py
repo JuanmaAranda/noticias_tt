@@ -16,17 +16,17 @@ from openai import OpenAI
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-REEMPLAZA-ESTO-CON-TU-API-KEY")
 
-FEEDS = [
-    "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
-    "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
-    "https://news.google.com/rss/search?q=TikTok+monetizacion&hl=es&gl=ES&ceid=ES:es",
-    "https://news.google.com/rss/search?q=TikTok+creadores&hl=es&gl=ES&ceid=ES:es",
-    "https://www.20minutos.es/rss/tecnologia/",
-    "https://feeds.feedburner.com/tubefilterNews",
-    "https://www.socialmediatoday.com/rss.xml",
-    "https://techcrunch.com/category/social/feed/",
-    "https://www.theguardian.com/technology/tiktok/rss",
-]
+FEEDS_FILE = Path("feeds.json")
+
+def cargar_feeds():
+    """Carga la lista de feeds RSS desde feeds.json"""
+    if FEEDS_FILE.exists():
+        try:
+            with open(FEEDS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError) as e:
+            log("⚠️ Error leyendo feeds.json: " + str(e) + ", usando feeds por defecto")
+    return FEEDS
 
 KEYWORDS = [
     "tiktok", "tik tok", "bytedance", "algorithm", "algoritmo",
@@ -504,14 +504,18 @@ def main():
         if slug in extractos:
             del extractos[slug]
 
+    # Cargar feeds desde archivo
+    feeds = cargar_feeds()
+    log("📡 " + str(len(feeds)) + " fuente(s) RSS configurada(s)")
+
     todas_noticias = []
-    for feed_url in FEEDS:
+    for feed_url in feeds:
         log("Leyendo feed: " + feed_url)
         items = obtener_feed(feed_url)
         todas_noticias.extend(items)
 
     ahora = datetime.now()
-    limite = ahora - timedelta(hours=48)
+    limite = ahora - timedelta(days=7)
     candidatas = []
     
     for item in todas_noticias:
