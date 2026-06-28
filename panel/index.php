@@ -28,7 +28,7 @@ if (!defined('OPENAI_API_KEY')) {
 // Ruta a la carpeta de noticias (relativa a este archivo)
 $NOTICIAS_DIR = dirname(__DIR__) . '/noticias/';
 $BORRADAS_FILE = __DIR__ . '/borradas.txt';
-$FEEDS_FILE = __DIR__ . '/feeds.json';
+$FEEDS_FILE = dirname(__DIR__) . '/feeds.json';
 
 // ============================================================
 // GESTIÓN DE FEEDS RSS
@@ -651,7 +651,6 @@ if ($format === 'json') {
         guardar_feeds($feeds);
         echo json_encode(['ok' => true, 'mensaje' => 'Fuente eliminada', 'feeds' => $feeds]);
         exit;
-    }
     }
 
     echo json_encode(['error' => 'Acción no válida']);

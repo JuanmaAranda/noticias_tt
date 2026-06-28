@@ -39,6 +39,40 @@ jobs:
       run: |
         python generar_noticias.py
 
+    - name: Leer resumen de ejecución
+      id: resumen
+      run: |
+        if [ -f resumen_ejecucion.json ]; then
+          ESTADO=$(python -c "import json; d=json.load(open('resumen_ejecucion.json')); print(d.get('estado','desconocido'))")
+          NOTICIAS=$(python -c "import json; d=json.load(open('resumen_ejecucion.json')); print(d.get('noticias_generadas',0))")
+          ERRORES=$(python -c "import json; d=json.load(open('resumen_ejecucion.json')); print(len(d.get('errores',[])))")
+          echo "estado=$ESTADO" >> $GITHUB_OUTPUT
+          echo "noticias=$NOTICIAS" >> $GITHUB_OUTPUT
+          echo "errores=$ERRORES" >> $GITHUB_OUTPUT
+        else
+          echo "estado=error" >> $GITHUB_OUTPUT
+          echo "noticias=0" >> $GITHUB_OUTPUT
+          echo "errores=1" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Enviar email de notificación
+      if: always()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "📰 TikPanel Noticias - ${{ steps.resumen.outputs.estado == 'ok' && 'Nuevas noticias generadas' || steps.resumen.outputs.estado == 'sin_noticias' && 'Sin noticias nuevas' || 'Error en ejecución' }}"
+        to: ${{ secrets.EMAIL_TO }}
+        from: "TikPanel Bot <${{ secrets.EMAIL_USERNAME }}>"
+        html_body: |
+          <h2>📰 Resumen de ejecución - TikPanel Noticias</h2>
+          <p><strong>Estado:</strong> ${{ steps.resumen.outputs.estado }}</p>
+          <p><strong>Noticias generadas:</strong> ${{ steps.resumen.outputs.noticias }}</p>
+          <p><strong>Errores:</strong> ${{ steps.resumen.outputs.errores }}</p>
+          <p><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">Ver detalles en GitHub Actions</a></p>
+
     - name: Commit y push de estado
       run: |
         git config user.name "TikPanel Bot"

@@ -45,8 +45,22 @@ NOTICIAS_DIR = Path("noticias")
 ESTADO_FILE = Path("estado_noticias.json")
 NOTICIAS_DIR.mkdir(exist_ok=True)
 
+# Resumen de ejecución para email
+RESUMEN_EJECUCION = {"estado": "iniciado", "noticias_generadas": 0, "errores": [], "mensajes": []}
+
 def log(msg):
     print("[" + datetime.now().strftime("%H:%M:%S") + "] " + msg)
+    RESUMEN_EJECUCION["mensajes"].append(msg)
+
+def log_error(msg):
+    log("ERROR: " + msg)
+    RESUMEN_EJECUCION["errores"].append(msg)
+    RESUMEN_EJECUCION["estado"] = "error"
+
+def guardar_resumen():
+    """Guarda el resumen de ejecución en un archivo JSON para que el workflow lo lea"""
+    with open("resumen_ejecucion.json", "w", encoding="utf-8") as f:
+        json.dump(RESUMEN_EJECUCION, f, ensure_ascii=False, indent=2)
 
 def normalizar_texto(texto):
     if not texto:
@@ -135,10 +149,21 @@ def obtener_feed(url):
             desc = item.findtext("description", default="")
             fecha_str = item.findtext("pubDate", default="")
             fecha = parsear_fecha(fecha_str) if fecha_str else None
-            if titulo and link:
+            
+            # Resolver redirecciones para obtener URL real (Google News, etc.)
+            url_real = link.strip()
+            if url_real and ("google.com" in url_real or "feedproxy" in url_real or "feeds" in url_real):
+                try:
+                    resp_redirect = requests.head(url_real, headers=headers, timeout=10, allow_redirects=True)
+                    if resp_redirect.status_code < 400 and resp_redirect.url != url_real:
+                        url_real = resp_redirect.url
+                except Exception:
+                    pass
+            
+            if titulo and url_real:
                 items.append({
                     "titulo": titulo.strip(),
-                    "url": link.strip(),
+                    "url": url_real,
                     "descripcion": desc.strip(),
                     "fecha": fecha,
                     "fecha_str": fecha_str,
@@ -589,7 +614,19 @@ def main():
     estado["ultima_ejecucion"] = ahora.isoformat()
     guardar_estado(estado)
 
+    RESUMEN_EJECUCION["noticias_generadas"] = len(nuevas_slugs)
+    if len(nuevas_slugs) > 0:
+        RESUMEN_EJECUCION["estado"] = "ok"
+    else:
+        RESUMEN_EJECUCION["estado"] = "sin_noticias"
+    guardar_resumen()
+
     log("Listo! Se generaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        log_error(str(e))
+        guardar_resumen()
+        raise
