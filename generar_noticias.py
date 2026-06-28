@@ -483,6 +483,27 @@ def main():
     extractos = estado.get("extractos", {})
     titulos_procesados = estado.get("titulos", [])
 
+    # Cargar noticias borradas desde el panel (si existe)
+    borradas_file = Path("panel/borradas.txt")
+    borradas = set()
+    if borradas_file.exists():
+        with open(borradas_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    borradas.add(line)
+        log("🗑 " + str(len(borradas)) + " noticia(s) marcada(s) como borrada(s) en el panel")
+
+    # Eliminar archivos de noticias borradas del repo local
+    for slug in borradas:
+        path = NOTICIAS_DIR / slug
+        if path.exists():
+            path.unlink()
+            log("   Eliminado del repo: " + slug)
+        # También eliminar del estado si existe
+        if slug in extractos:
+            del extractos[slug]
+
     todas_noticias = []
     for feed_url in FEEDS:
         log("Leyendo feed: " + feed_url)
@@ -531,6 +552,12 @@ def main():
         )
         
         slug = generar_slug(titulo_ia)
+        
+        # Verificar que el slug no esté en la lista de borradas
+        if slug in borradas:
+            log("   ⏭ Saltado (noticia previamente borrada desde el panel): " + slug)
+            continue
+        
         crear_html_noticia(
             titulo_ia,
             contenido_ia,

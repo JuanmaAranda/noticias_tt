@@ -1,0 +1,12 @@
+# TikPanel News - Archivos sensibles
+# NO subir a GitHub
+
+# Configuración local del panel (credenciales reales)
+panel/config.php
+
+# Archivo de noticias borradas (se genera en el servidor)
+panel/borradas.txt
+
+# Variables de entorno locales
+.env
+*.env

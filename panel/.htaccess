@@ -1,0 +1,12 @@
+RewriteEngine On
+
+# Proteger archivos sensibles
+<Files "config.php">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Redirigir todo a index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
