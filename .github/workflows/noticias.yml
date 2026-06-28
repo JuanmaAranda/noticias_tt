@@ -47,6 +47,8 @@ jobs:
     - name: Ejecutar generador de noticias
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        LINKEDIN_COOKIES: ${{ secrets.LINKEDIN_COOKIES }}
+        LINKEDIN_CSRF: ${{ secrets.LINKEDIN_CSRF }}
       run: |
         python generar_noticias.py
 
