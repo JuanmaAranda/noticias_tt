@@ -44,6 +44,11 @@ jobs:
           echo "feeds.json vacío o no descargado, se usarán feeds por defecto"
         fi
 
+    - name: Verificar secrets
+      run: |
+        echo "LINKEDIN_COOKIES está configurado: ${{ secrets.LINKEDIN_COOKIES != '' }}"
+        echo "LINKEDIN_CSRF está configurado: ${{ secrets.LINKEDIN_CSRF != '' }}"
+
     - name: Ejecutar generador de noticias
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
