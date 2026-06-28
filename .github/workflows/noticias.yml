@@ -30,12 +30,18 @@ jobs:
 
     - name: Descargar lista de borradas y feeds desde el servidor
       run: |
-        curl -s -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt"
-        curl -s -o feeds.json "https://tikpanel.app/feeds.json" || echo "No hay feeds.json, usando por defecto"
-        # Si feeds.json está vacío, eliminarlo para usar defaults
-        if [ ! -s feeds.json ]; then
+        # Descargar borradas.txt
+        curl -fsSL -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt"
+        # Descargar feeds.json con seguimiento de redirecciones
+        echo "Descargando feeds.json..."
+        curl -fsSL -o feeds.json "https://tikpanel.app/feeds.json" && echo "feeds.json descargado correctamente" || echo "No se pudo descargar feeds.json, usando por defecto"
+        # Verificar contenido
+        if [ -s feeds.json ]; then
+          echo "Contenido de feeds.json:"
+          cat feeds.json | head -5
+        else
           rm -f feeds.json
-          echo "feeds.json vacío o no encontrado, se usarán feeds por defecto"
+          echo "feeds.json vacío o no descargado, se usarán feeds por defecto"
         fi
 
     - name: Ejecutar generador de noticias
