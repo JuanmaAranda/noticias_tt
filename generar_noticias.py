@@ -20,13 +20,27 @@ FEEDS_FILE = Path("feeds.json")
 
 def cargar_feeds():
     """Carga la lista de feeds RSS desde feeds.json"""
+    feeds_default = [
+        "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+monetizacion&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+creadores&hl=es&gl=ES&ceid=ES:es",
+        "https://www.20minutos.es/rss/tecnologia/",
+        "https://feeds.feedburner.com/tubefilterNews",
+        "https://www.socialmediatoday.com/rss.xml",
+        "https://techcrunch.com/category/social/feed/",
+        "https://www.theguardian.com/technology/tiktok/rss"
+    ]
+    
     if FEEDS_FILE.exists():
         try:
             with open(FEEDS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                contenido = f.read().strip()
+                if contenido:
+                    return json.load(f)
         except (json.JSONDecodeError, ValueError) as e:
             log("⚠️ Error leyendo feeds.json: " + str(e) + ", usando feeds por defecto")
-    return FEEDS
+    return feeds_default
 
 KEYWORDS = [
     "tiktok", "tik tok", "bytedance", "algorithm", "algoritmo",
