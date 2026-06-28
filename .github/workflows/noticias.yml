@@ -3,9 +3,6 @@ name: Generar Noticias Automáticas + Deploy FTP
 on:
   schedule:
     - cron: '0 9 * * *'
-    - cron: '0 12 * * *'
-    - cron: '0 15 * * *'
-    - cron: '0 18 * * *'
   workflow_dispatch:
 
 permissions:
@@ -31,16 +28,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Ejecutar generador de noticias (con reintentos automáticos)
-      uses: nick-fields/retry@v3
-      with:
-        timeout_minutes: 15
-        max_attempts: 5
-        retry_wait_seconds: 300
-        command: |
-          python generar_noticias.py
+    - name: Ejecutar generador de noticias
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        python generar_noticias.py
 
     - name: Commit y push de estado
       run: |
@@ -58,20 +50,15 @@ jobs:
       run: sudo apt-get install -y lftp
 
     - name: Subir noticias por FTP
-      uses: nick-fields/retry@v3
-      with:
-        timeout_minutes: 10
-        max_attempts: 3
-        retry_wait_seconds: 60
-        command: |
-          lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 <<EOF
-          set ssl:verify-certificate no
-          set ftp:ssl-allow yes
-          set ftp:ssl-force yes
-          set ftp:ssl-protect-data yes
-          set ftp:ssl-protect-list yes
-          set net:timeout 30
-          set net:max-retries 3
-          mirror -R -p --delete -v noticias/ /noticias/
-          bye
-          EOF
+      run: |
+        lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 <<EOF
+        set ssl:verify-certificate no
+        set ftp:ssl-allow yes
+        set ftp:ssl-force yes
+        set ftp:ssl-protect-data yes
+        set ftp:ssl-protect-list yes
+        set net:timeout 30
+        set net:max-retries 3
+        mirror -R -p noticias/ /noticias/
+        bye
+        EOF
