@@ -39,7 +39,6 @@ KEYWORDS = [
 ]
 
 MAX_NOTICIAS_POR_DIA = 2
-SIMILITUD_MINIMA = 0.75  # 75% de similitud = duplicado
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 NOTICIAS_DIR = Path("noticias")
@@ -67,14 +66,44 @@ def es_relevante(titulo, descripcion=""):
 def generar_id(url, titulo):
     return hashlib.md5((url + titulo).encode()).hexdigest()
 
-def comprobar_titulo_similar(titulo, titulos_existentes, umbral=SIMILITUD_MINIMA):
-    """Comprueba si el título es similar a alguno ya procesado."""
-    titulo_norm = normalizar_texto(titulo)
-    for t in titulos_existentes:
-        similitud = difflib.SequenceMatcher(None, titulo_norm, normalizar_texto(t)).ratio()
-        if similitud >= umbral:
-            return True, t, similitud
-    return False, None, 0
+def noticia_ya_existe_ia(nuevo_titulo, nueva_desc, titulos_existentes):
+    """Utiliza la IA para saber si conceptualmente la noticia ya se ha publicado."""
+    if not titulos_existentes:
+        return False
+        
+    # Pasamos solo los últimos 20 títulos para optimizar el contexto
+    contexto_existente = "\n".join([f"- {t}" for t in titulos_existentes[-20:]])
+    
+    prompt = (
+        "Se te proporciona una lista de noticias que ya han sido publicadas en un blog, "
+        "y los datos de una nueva noticia entrante.\n\n"
+        "NOTICIAS YA PUBLICADAS:\n"
+        f"{contexto_existente}\n\n"
+        "NUEVA NOTICIA CANDIDATA:\n"
+        f"- Titulo: {nuevo_titulo}\n"
+        f"- Descripción: {nueva_desc}\n\n"
+        "Tu tarea es determinar si la nueva noticia candidata describe exactamente EL MISMO HECHO O EVENTO REAL "
+        "que alguna de las ya publicadas, aunque esté redactada con palabras totalmente distintas.\n\n"
+        "Responde ÚNICAMENTE con la palabra 'DUPLICADO' si el hecho central ya existe, "
+        "o 'NUEVO' si es un hecho o actualización completamente diferente.\n"
+        "Respuesta:"
+    )
+    
+    try:
+        respuesta = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Eres un asistente editorial estricto. Solo respondes 'DUPLICADO' o 'NUEVO'."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0,
+            max_tokens=5
+        )
+        veredicto = respuesta.choices[0].message.content.strip().upper()
+        return "DUPLICADO" in veredicto
+    except Exception as e:
+        log(f"Error en validación de duplicados por IA: {e}")
+        return False
 
 def parsear_fecha(fecha_str):
     formatos = [
@@ -136,18 +165,12 @@ def guardar_estado(estado):
         json.dump(estado, f, ensure_ascii=False, indent=2)
 
 def limpiar_estado(estado):
-    """Elimina del estado los artículos cuyo archivo HTML ya no existe."""
     archivos_existentes = {f.name for f in NOTICIAS_DIR.glob("*.html") if f.name != "index.html"}
-
-    # Limpiar extractos
     extractos = estado.get("extractos", {})
     extractos_limpio = {k: v for k, v in extractos.items() if k in archivos_existentes}
     if len(extractos_limpio) != len(extractos):
         log("🧹 Eliminados " + str(len(extractos) - len(extractos_limpio)) + " extractos de artículos borrados")
 
-    # Limpiar titulos (solo mantener los que aún existen)
-    titulos = estado.get("titulos", [])
-    # Reconstruir lista de titulos a partir de archivos existentes
     titulos_limpio = []
     for f in sorted(NOTICIAS_DIR.glob("*.html")):
         if f.name == "index.html":
@@ -200,39 +223,33 @@ def generar_extracto(contenido_html, max_chars=140):
 
 def generar_articulo_ia(titulo, descripcion, url_fuente):
     prompt = (
-        "Eres un redactor experto en redes sociales para TikPanel (tikpanel.app).\n\n"
-        "Tu tarea: escribir un articulo de noticias de 350-500 palabras en ESPANOL, "
-        "basado en la siguiente noticia externa. NO copies texto literal. "
-        "Reescribelo completamente con tu propio estilo, manteniendo los hechos clave.\n\n"
-        "INFORMACION DE LA NOTICIA ORIGINAL:\n"
-        "- Titulo: " + titulo + "\n"
-        "- Descripcion: " + descripcion + "\n"
-        "- URL fuente: " + url_fuente + "\n\n"
-        "ESTRUCTURA REQUERIDA:\n"
-        "1. Titulo atractivo y claro (max 70 caracteres)\n"
-        "2. Subtitulo o entradilla (1-2 frases)\n"
-        "3. 3-4 parrafos de desarrollo\n"
-        "4. Conclusion con implicacion para creadores de contenido\n"
-        "5. NO incluyas la fuente original ni URLs en el contenido. Eso se añade automaticamente despues.\n\n"
-        "REGLAS IMPORTANTES:\n"
-        "- Usa SOLO HTML para negritas: <strong>texto</strong> (NO uses ** ni markdown)\n"
-        "- Usa <p> para cada parrafo\n"
-        "- NO incluyas URLs largas en el texto\n"
-        "- NO escribas 'Fuente original' al final\n"
-        "- Tono profesional, directo y util para creadores de TikTok\n"
-        "- Si la noticia esta en ingles, traduce y adapta al espanol\n\n"
-        "Responde UNICAMENTE en este formato exacto:\n"
-        "TITULO: <titulo aqui>\n"
-        "CONTENIDO: <contenido HTML aqui (solo <p> y <strong>)>"
+        "Eres un periodista tecnológico y redactor SEO experto para la plataforma TikPanel (tikpanel.app).\n\n"
+        "Tu objetivo es redactar una noticia original, informativa y de alto valor periodístico basada en datos externos. "
+        "Google penaliza el contenido genérico, así que debes enfocarte en HECHOS, DATOS, NOMBRES y PROTAGONISTAS reales. "
+        "No inventes cosas que no estén en el texto original, pero extrae y enfatiza cada detalle concreto que encuentres.\n\n"
+        "INFORMACIÓN ORIGINAL EXTRAÍDA DEL FEED:\n"
+        "- Titulo original: " + titulo + "\n"
+        "- Descripción original: " + descripcion + "\n\n"
+        "REGLAS DE REDACCIÓN Y SEO (ESTRICTAS):\n"
+        "1. Enfócate al 100% en los hechos ocurridos. ¿Qué pasó? ¿Quién lo hizo? ¿Cuándo? Evita generalidades.\n"
+        "2. PROHIBIDO usar lenguaje cliché de IA. No uses palabras como: 'en el dinámico mundo', 'revolucionario', 'crucial', 'es fundamental', 'un hito', 'fascinante'. Sé directo y periodístico.\n"
+        "3. Longitud: Entre 300 y 450 palabras organizadas de forma lógica.\n"
+        "4. El artículo debe ser útil para creadores de contenido, streamers y marketers que usan TikTok.\n\n"
+        "ESTRUCTURA DEL OUTPUT:\n"
+        "- TITULO: Un titular periodístico limpio, optimizado para SEO (máx. 70 caracteres), que incluya palabras clave naturales.\n"
+        "- CONTENIDO: El cuerpo de la noticia en formato HTML puro. Organízalo con etiquetas <p> para párrafos normales. Usa <strong>únicamente</strong> para destacar palabras clave importantes (máx 3-4 por párrafo). Puedes incluir un subtítulo intermedio usando <h3> si ayuda a estructurar el texto.\n\n"
+        "Responde ÚNICAMENTE en este formato estructural exacto:\n"
+        "TITULO: <titular aquí>\n"
+        "CONTENIDO: <cuerpo en HTML aquí>"
     )
     try:
         respuesta = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Eres un editor de noticias especializado en TikTok y redes sociales. Escribes en espanol perfecto. Usas SOLO HTML, nunca markdown."},
+                {"role": "system", "content": "Eres un redactor SEO y periodista de tecnología. Escribes con un tono informativo, directo, sin introducciones vacías ni palabras cliché de IA. Usas exclusivamente etiquetas HTML (<p>, <strong>, <h3>)."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
+            temperature=0.4,
             max_tokens=1500,
         )
         texto = respuesta.choices[0].message.content.strip()
@@ -251,7 +268,7 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
 
 def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
     fecha_formateada = fecha.strftime("%d de %B de %Y") if fecha else datetime.now().strftime("%d de %B de %Y")
-    anio = datetime.now().year
+    meta_desc = generar_extracto(contenido, 150)
 
     html = (
         "<!DOCTYPE html>\n"
@@ -260,7 +277,7 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         "    <meta charset=\"UTF-8\">\n"
         "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
         "    <title>" + titulo + " | Noticias TikPanel</title>\n"
-        "    <meta name=\"description\" content=\"Noticias sobre TikTok: " + titulo[:150] + "\">\n"
+        "    <meta name=\"description\" content=\"" + meta_desc + "\">\n"
         "    <link rel=\"stylesheet\" href=\"../css/style.css\">\n"
         "</head>\n"
         "<body>\n"
@@ -300,23 +317,23 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         "                </header>\n"
         "\n"
         "                <section class=\"post-intro\">\n"
-        "                    <p>Resumen generado automaticamente por inteligencia artificial a partir de fuentes publicas.</p>\n"
+        "                    <p>Resumen informativo de actualidad redactado en base a reportes del sector.</p>\n"
         "                </section>\n"
         "\n"
         "                <hr class=\"section-divider\">\n"
         "\n"
-        "                <section>\n"
+        "                <section class=\"article-body-content\">\n"
         "                    " + contenido + "\n"
         "                    <div class=\"info-box warning\" style=\"margin-top: 2rem;\">\n"
-        "                        <span class=\"box-title\">⚠️ Aviso importante</span>\n"
-        "                        <p>Este articulo es un <strong>resumen generado automaticamente por IA</strong> a partir de noticias publicas. La informacion original proviene de: <a href=\"" + url_fuente + "\" target=\"_blank\" rel=\"noopener noreferrer\">Ver fuente original</a></p>\n"
+        "                        <span class=\"box-title\">⚠️ Referencia externa</span>\n"
+        "                        <p>Este contenido ha sido estructurado de forma informativa. Puedes consultar los detalles adicionales en la <a href=\"" + url_fuente + "\" target=\"_blank\" rel=\"noopener noreferrer\">fuente original de la noticia</a>.</p>\n"
         "                    </div>\n"
         "                </section>\n"
         "\n"
         "                <footer class=\"post-footer\">\n"
         "                    <div class=\"post-footer-card\">\n"
-        "                        <h3>Mantente al dia con TikPanel</h3>\n"
-        "                        <p>Descubre las ultimas novedades sobre TikTok, el algoritmo y las mejores herramientas para creadores. Visita nuestra seccion de <a href=\"index.html\">noticias</a> o descarga TikPanel para llevar tus directos al siguiente nivel.</p>\n"
+        "                        <h3>Mantente al día con TikPanel</h3>\n"
+        "                        <p>Descubre las últimas novedades sobre TikTok, el algoritmo y las mejores herramientas para creadores. Visita nuestra sección de <a href=\"index.html\">noticias</a> o descarga TikPanel para llevar tus directos al siguiente nivel.</p>\n"
         "                    </div>\n"
         "                </footer>\n"
         "\n"
@@ -350,7 +367,7 @@ def actualizar_index(extractos):
             continue
         fecha_obj = datetime.fromtimestamp(f.stat().st_mtime)
         titulo = "Noticia"
-        extracto = extractos.get(f.name, "Resumen de la noticia sobre TikTok. Haz clic para leer el articulo completo.")
+        extracto = extractos.get(f.name, "Resumen de la noticia sobre TikTok. Haz clic para leer el artículo completo.")
         try:
             with open(f, "r", encoding="utf-8") as file:
                 html = file.read()
@@ -382,14 +399,13 @@ def actualizar_index(extractos):
             "        </h2>\n"
             "        <p class=\"blog-card-excerpt\">" + e["extracto"] + "</p>\n"
             "        <a href=\"" + e["archivo"] + "\" class=\"blog-card-cta\">\n"
-            "            Leer mas\n"
+            "            Leer más\n"
             "            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg>\n"
             "        </a>\n"
             "    </div>\n"
             "</article>\n"
         )
 
-    anio = datetime.now().year
     html = (
         "<!DOCTYPE html>\n"
         "<html lang=\"es\">\n"
@@ -397,7 +413,7 @@ def actualizar_index(extractos):
         "    <meta charset=\"UTF-8\">\n"
         "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
         "    <title>Noticias sobre TikTok | TikPanel</title>\n"
-        "    <meta name=\"description\" content=\"Noticias diarias automaticas sobre TikTok, algoritmo, creadores y tendencias.\">\n"
+        "    <meta name=\"description\" content=\"Noticias diarias automáticas sobre TikTok, algoritmo, creadores y tendencias.\">\n"
         "    <link rel=\"stylesheet\" href=\"../css/style.css\">\n"
         "</head>\n"
         "<body>\n"
@@ -415,9 +431,9 @@ def actualizar_index(extractos):
         "                Noticias Automáticas\n"
         "            </span>\n"
         "            <h1 class=\"text-gradient\">Noticias sobre TikTok</h1>\n"
-        "            <p>Resumen diario automatico de las noticias mas relevantes sobre TikTok, el algoritmo, monetizacion y tendencias para creadores.</p>\n"
+        "            <p>Resumen diario automático de las noticias más relevantes sobre TikTok, el algoritmo, monetización y tendencias para creadores.</p>\n"
         "            <p class=\"noticias-disclaimer\" style=\"color: var(--text3); font-size: 0.9rem; margin-top: 1.5rem;\">\n"
-        "                <small>⚠️ Los articulos son generados automaticamente por IA a partir de fuentes publicas. Siempre se incluye el enlace a la noticia original.</small>\n"
+        "                <small>⚠️ Los artículos son generados automáticamente por IA a partir de fuentes públicas. Siempre se incluye el enlace a la noticia original.</small>\n"
         "            </p>\n"
         "        </div>\n"
         "    </section>\n"
@@ -434,14 +450,14 @@ def actualizar_index(extractos):
         "        <div class=\"container\">\n"
         "            <div class=\"blog-cta-card\">\n"
         "                <div class=\"blog-cta-content\">\n"
-        "                    <h2>Mantente informado cada dia</h2>\n"
-        "                    <p>Esta seccion se actualiza automaticamente con las ultimas noticias sobre TikTok. Vuelve mañana para mas contenido.</p>\n"
+        "                    <h2>Mantente informado cada día</h2>\n"
+        "                    <p>Esta sección se actualización automáticamente con las últimas noticias sobre TikTok. Vuelve mañana para más contenido.</p>\n"
         "                    <div class=\"blog-cta-buttons\">\n"
         "                        <a href=\"https://free.tikpanel.app\" class=\"btn btn-primary\" target=\"_blank\">\n"
         "                            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" x2=\"12\" y1=\"15\" y2=\"3\"/></svg>\n"
         "                            Descargar TikPanel\n"
         "                        </a>\n"
-        "                        <a href=\"../documentacion.html\" class=\"btn btn-secondary\">Ver Documentacion</a>\n"
+        "                        <a href=\"../documentacion.html\" class=\"btn btn-secondary\">Ver Documentación</a>\n"
         "                    </div>\n"
         "                </div>\n"
         "            </div>\n"
@@ -459,12 +475,8 @@ def actualizar_index(extractos):
         f.write(html)
 
 def main():
-    log("Iniciando generacion de noticias automaticas...")
-    log("Fecha: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
+    log("Iniciando generación de noticias automáticas...")
     estado = cargar_estado()
-
-    # LIMPIAR: eliminar del estado los artículos borrados manualmente
     estado = limpiar_estado(estado)
 
     procesados = set(estado.get("procesados", []))
@@ -475,12 +487,12 @@ def main():
     for feed_url in FEEDS:
         log("Leyendo feed: " + feed_url)
         items = obtener_feed(feed_url)
-        log("   → " + str(len(items)) + " articulos encontrados")
         todas_noticias.extend(items)
 
     ahora = datetime.now()
     limite = ahora - timedelta(hours=48)
     candidatas = []
+    
     for item in todas_noticias:
         noticia_id = generar_id(item["url"], item["titulo"])
         if noticia_id in procesados:
@@ -489,47 +501,55 @@ def main():
             continue
         if not es_relevante(item["titulo"], item["descripcion"]):
             continue
-        # DETECTAR DUPLICADOS SIMILARES
-        similar, titulo_sim, ratio = comprobar_titulo_similar(item["titulo"], titulos_procesados)
-        if similar:
-            log("   ⏭ Saltado (similar a: " + titulo_sim + ", ratio=" + str(round(ratio, 2)) + ")")
-            continue
+            
         candidatas.append({**item, "id": noticia_id})
 
-    log(str(len(candidatas)) + " noticias candidatas tras filtrar")
+    log(str(len(candidatas)) + " noticias candidatas tras filtrar relevancia básica")
 
+    if not candidatas:
+        log("No hay noticias nuevas relevantes hoy. Saliendo.")
+        guardar_estado(estado)
+        return
+
+    publicadas_hoy = 0
     nuevas_slugs = []
 
-    if candidatas:
-        a_procesar = candidatas[:MAX_NOTICIAS_POR_DIA]
+    for noticia in candidatas:
+        if publicadas_hoy >= MAX_NOTICIAS_POR_DIA:
+            break
 
-        for noticia in a_procesar:
-            log("Procesando: " + noticia["titulo"][:80] + "...")
-            titulo_ia, contenido_ia = generar_articulo_ia(
-                noticia["titulo"],
-                noticia["descripcion"],
-                noticia["url"]
-            )
-            slug = generar_slug(titulo_ia)
-            crear_html_noticia(
-                titulo_ia,
-                contenido_ia,
-                noticia["url"],
-                noticia["fecha"] or datetime.now(),
-                slug
-            )
-            procesados.add(noticia["id"])
-            extracto = generar_extracto(contenido_ia)
-            extractos[slug] = extracto
-            titulos_procesados.append(titulo_ia)
-            nuevas_slugs.append(slug)
-            log("Guardado: noticias/" + slug)
-    else:
-        log("No hay noticias nuevas. Solo se regenera el indice.")
+        # Filtro semántico dinámico por IA justo antes de procesar
+        if noticia_ya_existe_ia(noticia["titulo"], noticia["descripcion"], titulos_procesados):
+            log("   ⏭ Saltado de forma dinámica (Duplicado conceptual detectado): " + noticia["titulo"][:60])
+            continue
 
-    # SIEMPRE regenerar el index, incluso si no hay noticias nuevas
-    # (asi se eliminan del indice los articulos borrados manualmente)
-    log("Actualizando indice de noticias...")
+        log("Procesando: " + noticia["titulo"][:80] + "...")
+        titulo_ia, contenido_ia = generar_articulo_ia(
+            noticia["titulo"],
+            noticia["descripcion"],
+            noticia["url"]
+        )
+        
+        slug = generar_slug(titulo_ia)
+        crear_html_noticia(
+            titulo_ia,
+            contenido_ia,
+            noticia["url"],
+            noticia["fecha"] or datetime.now(),
+            slug
+        )
+        
+        procesados.add(noticia["id"])
+        extracto = generar_extracto(contenido_ia)
+        extractos[slug] = extracto
+        
+        # Agregamos inmediatamente al listado en memoria para que el siguiente elemento del bucle lo herede
+        titulos_procesados.append(titulo_ia)
+        nuevas_slugs.append(slug)
+        publicadas_hoy += 1
+        log("Guardado: noticias/" + slug)
+
+    log("Actualizando índice de noticias...")
     actualizar_index(extractos)
 
     estado["procesados"] = list(procesados)
@@ -538,12 +558,7 @@ def main():
     estado["ultima_ejecucion"] = ahora.isoformat()
     guardar_estado(estado)
 
-    if nuevas_slugs:
-        log("Listo! Se generaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
-        for s in nuevas_slugs:
-            log("   → noticias/" + s)
-    else:
-        log("Indice regenerado. No hay noticias nuevas.")
+    log("Listo! Se generaron " + str(len(nuevas_slugs)) + " noticia(s) nueva(s).")
 
 if __name__ == "__main__":
     main()
