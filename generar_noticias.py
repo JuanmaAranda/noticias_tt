@@ -116,19 +116,18 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # Inicializar cliente de IA
 client = None
-if GEMINI_API_KEY:
+if OPENAI_API_KEY:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    USAR_GEMINI = False
+    print("[OK] Usando OpenAI como motor de IA")
+elif GEMINI_API_KEY:
     import google.generativeai as genai
     genai.configure(api_key=GEMINI_API_KEY)
     USAR_GEMINI = True
-    # También inicializar OpenAI como fallback
-    if OPENAI_API_KEY:
-        client = OpenAI(api_key=OPENAI_API_KEY)
-    else:
-        client = None
-elif OPENAI_API_KEY:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    USAR_GEMINI = False
+    print("[OK] Usando Gemini como motor de IA")
 else:
+    print("[ERROR] No hay API key configurada. Configura OPENAI_API_KEY o GEMINI_API_KEY.")
+    USAR_GEMINI = False
     USAR_GEMINI = False
 
 FEEDS_FILE = Path("feeds.json")
@@ -434,18 +433,38 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
     
     try:
         if USAR_GEMINI and GEMINI_API_KEY:
-            # Usar Gemini
-            model = genai.GenerativeModel('gemini-2.0-flash')
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.1,  # Muy bajo para evitar inventos
-                    max_output_tokens=1500,
+            # Intentar con Gemini primero
+            try:
+                model = genai.GenerativeModel('gemini-2.0-flash')
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.1,
+                        max_output_tokens=1500,
+                    )
                 )
-            )
-            texto = response.text.strip()
+                texto = response.text.strip()
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "quota" in error_msg.lower() or "exceeded" in error_msg.lower():
+                    log("   ⚠️ Gemini cuota excedida (429), intentando con OpenAI...")
+                    if client:
+                        respuesta = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {"role": "system", "content": "Eres un periodista de agencia. Extraes hechos reales de textos fuente sin inventar nada. Si no hay dato concreto, no lo menciones."},
+                                {"role": "user", "content": prompt}
+                            ],
+                            temperature=0.1,
+                            max_tokens=1500,
+                        )
+                        texto = respuesta.choices[0].message.content.strip()
+                    else:
+                        raise Exception("No hay API de OpenAI configurada para fallback")
+                else:
+                    raise
         elif client:
-            # Fallback a OpenAI
+            # Usar OpenAI directamente
             respuesta = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -458,6 +477,8 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
             texto = respuesta.choices[0].message.content.strip()
         else:
             # Sin API disponible
+            log("   ❌ No hay API de IA configurada")
+            return titulo, "<p>" + descripcion + "</p>"
             log("⚠️ No hay API de IA disponible, usando descripción como contenido")
             return titulo, "<p>" + descripcion + "</p>"
         
