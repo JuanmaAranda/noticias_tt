@@ -233,9 +233,15 @@ def obtener_feed(url):
             url_real = link.strip()
             if url_real and ("google.com" in url_real or "feedproxy" in url_real or "feeds" in url_real):
                 try:
+                    # Primero intentar con HEAD
                     resp_redirect = requests.head(url_real, headers=headers, timeout=10, allow_redirects=True)
                     if resp_redirect.status_code < 400 and resp_redirect.url != url_real:
                         url_real = resp_redirect.url
+                    else:
+                        # Si HEAD no funciona, intentar con GET
+                        resp_redirect = requests.get(url_real, headers=headers, timeout=10, allow_redirects=True)
+                        if resp_redirect.status_code < 400 and resp_redirect.url != url_real:
+                            url_real = resp_redirect.url
                 except Exception:
                     pass
             
