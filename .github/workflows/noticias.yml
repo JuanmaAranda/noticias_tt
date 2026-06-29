@@ -41,16 +41,10 @@ jobs:
       run: |
         echo "NEWSAPI_KEY está configurado: ${{ secrets.NEWSAPI_KEY != '' }}"
 
-    - name: Resetear estado para regenerar todas las noticias
-      run: |
-        rm -f estado_noticias.json
-        echo "Estado reseteado. Se regenerarán todas las noticias desde cero."
-
-    - name: Ejecutar generador de noticias
+    - name: Ejecutar recolector de noticias
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
       run: |
         python generar_noticias.py
 
@@ -59,14 +53,14 @@ jobs:
       run: |
         if [ -f resumen_ejecucion.json ]; then
           ESTADO=$(python -c "import json; d=json.load(open('resumen_ejecucion.json')); print(d.get('estado','desconocido'))")
-          NOTICIAS=$(python -c "import json; d=json.load(open('resumen_ejecucion.json')); print(d.get('noticias_generadas',0))")
+          URLS=$(python -c "import json; d=json.load(open('resumen_ejecucion.json')); print(d.get('urls_encontradas',0))")
           ERRORES=$(python -c "import json; d=json.load(open('resumen_ejecucion.json')); print(len(d.get('errores',[])))")
           echo "estado=$ESTADO" >> $GITHUB_OUTPUT
-          echo "noticias=$NOTICIAS" >> $GITHUB_OUTPUT
+          echo "urls=$URLS" >> $GITHUB_OUTPUT
           echo "errores=$ERRORES" >> $GITHUB_OUTPUT
         else
           echo "estado=error" >> $GITHUB_OUTPUT
-          echo "noticias=0" >> $GITHUB_OUTPUT
+          echo "urls=0" >> $GITHUB_OUTPUT
           echo "errores=1" >> $GITHUB_OUTPUT
         fi
 
@@ -78,25 +72,25 @@ jobs:
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "📰 TikPanel Noticias - ${{ steps.resumen.outputs.estado == 'ok' && 'Nuevas noticias generadas' || steps.resumen.outputs.estado == 'sin_noticias' && 'Sin noticias nuevas' || 'Error en ejecución' }}"
+        subject: "📰 TikPanel Noticias - ${{ steps.resumen.outputs.estado == 'ok' && 'Nuevas URLs encontradas' || steps.resumen.outputs.estado == 'sin_nuevas' && 'Sin nuevas URLs' || 'Error en ejecución' }}"
         to: ${{ secrets.EMAIL_TO }}
         from: "TikPanel Bot <${{ secrets.EMAIL_USERNAME }}>"
         html_body: |
           <h2>📰 Resumen de ejecución - TikPanel Noticias</h2>
           <p><strong>Estado:</strong> ${{ steps.resumen.outputs.estado }}</p>
-          <p><strong>Noticias generadas:</strong> ${{ steps.resumen.outputs.noticias }}</p>
+          <p><strong>Nuevas URLs encontradas:</strong> ${{ steps.resumen.outputs.urls }}</p>
           <p><strong>Errores:</strong> ${{ steps.resumen.outputs.errores }}</p>
           <p><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">Ver detalles en GitHub Actions</a></p>
 
-    - name: Commit y push de estado
+    - name: Commit y push de pendientes.json
       run: |
         git config user.name "TikPanel Bot"
         git config user.email "bot@tikpanel.app"
-        git add noticias/ estado_noticias.json
+        git add pendientes.json
         if git diff --staged --quiet; then
           echo "No hay cambios nuevos"
         else
-          git commit -m "🤖 Noticias automáticas: $(date +%Y-%m-%d)"
+          git commit -m "🤖 URLs pendientes actualizadas: $(date +%Y-%m-%d)"
           git push
         fi
 
