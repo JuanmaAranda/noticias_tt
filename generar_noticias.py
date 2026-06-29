@@ -320,8 +320,11 @@ def limpiar_urls(contenido):
     return patron.sub(link_replacer, contenido)
 
 def limpiar_fuentes(contenido):
+    # Eliminar fuentes originales en varios formatos
+    contenido = re.sub(r"\n?---\n?\s*Fuente original:\s*.*?\n?", "", contenido, flags=re.DOTALL)
     contenido = re.sub(r"<p>\s*---+\s*Fuente original:.*?</p>", "", contenido, flags=re.DOTALL)
     contenido = re.sub(r"---+\s*Fuente original:.*", "", contenido, flags=re.DOTALL)
+    contenido = re.sub(r"\n?\[.*?\]\(https?://.*?\)\n?", "", contenido)
     return contenido.strip()
 
 def generar_extracto(contenido_html, max_chars=140):
@@ -344,7 +347,8 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         "1. Enfócate al 100% en los hechos ocurridos. ¿Qué pasó? ¿Quién lo hizo? ¿Cuándo? Evita generalidades.\n"
         "2. PROHIBIDO usar lenguaje cliché de IA. No uses palabras como: 'en el dinámico mundo', 'revolucionario', 'crucial', 'es fundamental', 'un hito', 'fascinante'. Sé directo y periodístico.\n"
         "3. Longitud: Entre 300 y 450 palabras organizadas de forma lógica.\n"
-        "4. El artículo debe ser útil para creadores de contenido, streamers y marketers que usan TikTok.\n\n"
+        "4. El artículo debe ser útil para creadores de contenido, streamers y marketers que usan TikTok.\n"
+        "5. NO incluyas fuentes originales, enlaces, ni referencias al final del artículo. El sistema añadirá eso automáticamente.\n\n"
         "ESTRUCTURA DEL OUTPUT:\n"
         "- TITULO: Un titular periodístico limpio, optimizado para SEO (máx. 70 caracteres), que incluya palabras clave naturales.\n"
         "- CONTENIDO: El cuerpo de la noticia en formato HTML puro. Organízalo con etiquetas <p> para párrafos normales. Usa <strong>únicamente</strong> para destacar palabras clave importantes (máx 3-4 por párrafo). Puedes incluir un subtítulo intermedio usando <h3> si ayuda a estructurar el texto.\n\n"
