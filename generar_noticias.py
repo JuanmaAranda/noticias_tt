@@ -135,15 +135,14 @@ FEEDS_FILE = Path("feeds.json")
 def cargar_feeds():
     """Carga la lista de feeds RSS desde feeds.json"""
     feeds_default = [
+        "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+monetizacion&hl=es&gl=ES&ceid=ES:es",
+        "https://news.google.com/rss/search?q=TikTok+creadores&hl=es&gl=ES&ceid=ES:es",
         "https://www.20minutos.es/rss/tecnologia/",
         "https://feeds.feedburner.com/tubefilterNews",
         "https://techcrunch.com/category/social/feed/",
-        "https://www.theguardian.com/technology/tiktok/rss",
-        "https://www.elmundo.es/tecnologia/rss.xml",
-        "https://www.elespanol.com/rss/tecnologia/",
-        "https://www.xataka.com/rss.xml",
-        "https://www.genbeta.com/rss",
-        "https://www.vidaextra.com/rss.xml"
+        "https://www.theguardian.com/technology/tiktok/rss"
     ]
     
     if FEEDS_FILE.exists():
@@ -278,9 +277,28 @@ def obtener_feed(url):
             fecha_str = item.findtext("pubDate", default="")
             fecha = parsear_fecha(fecha_str) if fecha_str else None
             
-            # Solo usar URLs que no sean de Google News (ya que no redirigen correctamente)
             url_real = link.strip()
-            if url_real and "google.com" not in url_real and "feedproxy" not in url_real:
+            
+            # Si es Google News, usar r.jina.ai para extraer el texto real
+            if url_real and "google.com" in url_real:
+                try:
+                    # r.jina.ai puede extraer texto de Google News URLs
+                    jina_url = "https://r.jina.ai/http://" + url_real.replace("https://", "").replace("http://", "")
+                    resp_jina = requests.get(jina_url, headers=headers, timeout=15)
+                    if resp_jina.status_code == 200:
+                        # El texto extraído se usará como descripción
+                        texto_jina = resp_jina.text.strip()
+                        if len(texto_jina) > 200:
+                            desc = texto_jina[:2000]  # Usar como descripción/contexto
+                            log("   ✓ Texto extraído con r.jina.ai: " + str(len(texto_jina)) + " chars")
+                        else:
+                            log("   ✗ Texto de r.jina.ai muy corto")
+                    else:
+                        log("   ✗ r.jina.ai falló: HTTP " + str(resp_jina.status_code))
+                except Exception as e:
+                    log("   ⚠️ Error con r.jina.ai: " + str(e))
+            
+            if titulo and url_real:
                 items.append({
                     "titulo": titulo.strip(),
                     "url": url_real,
