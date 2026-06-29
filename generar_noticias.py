@@ -689,11 +689,18 @@ def main():
     ahora = datetime.now()
     limite = ahora - timedelta(days=7)
     candidatas = []
+    urls_vistas = set()
     
     for item in todas_noticias:
         noticia_id = generar_id(item["url"], item["titulo"])
         if noticia_id in procesados:
             continue
+        # Filtro adicional: no procesar la misma URL exacta dos veces
+        url_normalizada = item["url"].split('?')[0].rstrip('/').lower()
+        if url_normalizada in urls_vistas:
+            log("   ⏭ URL duplicada en NewsAPI: " + item["titulo"][:60])
+            continue
+        urls_vistas.add(url_normalizada)
         if item["fecha"] and item["fecha"] < limite:
             continue
         if not es_relevante(item["titulo"], item["descripcion"]):
