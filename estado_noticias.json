@@ -1,16 +1,18 @@
 {
   "procesados": [
-    "ace675b5f40a20b0438a77d9addb3c02",
-    "fb51e6fcca4e671133b0f19efa8a38a8"
+    "fb51e6fcca4e671133b0f19efa8a38a8",
+    "ace675b5f40a20b0438a77d9addb3c02"
   ],
-  "ultima_ejecucion": "2026-06-29T17:17:49.483764",
+  "ultima_ejecucion": "2026-06-29T17:28:04.166947",
   "extractos": {
-    "confirmado-el-despido-de-un-camarero-por-un-vídeo-de-tiktok.html": "Confirmado el despido de un camarero por un vídeo de TikTok grabado en su horario laboral&nbsp;&nbsp;El Periódico",
-    "bajo-los-escombros-en-venezuela-vivos-de-tiktok-y-antenas-st.html": "Bajo los escombros en Venezuela, vivos de TikTok y antenas Starlink permiten el hallazgo de supervivientes&nbsp;&nbsp;Infobae"
+    "supervivientes-hallados-en-venezuela-gracias-a-tiktok-y-star.html": "En Venezuela, se han encontrado supervivientes bajo los escombros tras un desastre. La utilización de TikTok y antenas Starlink ha sido...",
+    "despido-de-camarero-por-vídeo-de-tiktok-en-horario-laboral.html": "Se ha confirmado el despido de un camarero debido a un vídeo de TikTok que fue grabado durante su horario laboral. Este hecho ha generado..."
   },
   "titulos": [
     "Alemania planea prohibir TikTok e Instagram para menores de edad",
+    "Bajo los escombros en Venezuela, vivos de TikTok y antenas Starlink permiten el hallazgo de supervivientes - Infobae",
     "Casi el 60% de los vídeos en TikTok para nuevos usuarios son generados por IA",
+    "Confirmado el despido de un camarero por un vídeo de TikTok grabado en su horario laboral - El Periódico",
     "Cubano en el extranjero responde a pedidos de recarga desde Cuba",
     "Cómo el algoritmo de TikTok afecta tu contenido y cómo recuperas el control",
     "Despido de camarero por vídeo en TikTok durante horario laboral",
@@ -37,7 +39,7 @@
     "Tiktoker británica en riesgo de ejecución por homicidio en Dubái",
     "Viral en TikTok: Cliente casado pierde a su asesora tras un mensaje",
     "YouTube lanza nueva función en Shorts para competir con TikTok",
-    "Confirmado el despido de un camarero por un vídeo de TikTok grabado en su horario laboral - El Periódico",
-    "Bajo los escombros en Venezuela, vivos de TikTok y antenas Starlink permiten el hallazgo de supervivientes - Infobae"
+    "Supervivientes hallados en Venezuela gracias a TikTok y Starlink",
+    "Despido de camarero por vídeo de TikTok en horario laboral"
   ]
 }
