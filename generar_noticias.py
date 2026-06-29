@@ -438,7 +438,7 @@ def crear_html_noticia(titulo, contenido, url_fuente, fecha, slug):
         "\n"
         "                <section class=\"article-body-content\">\n"
         "                    " + contenido + "\n"
-        "                    <div class=\"info-box warning\" style=\"margin-top: 2rem;\">\n"
+        "                    <div class=\"info-box warning\" style=\"margin-top: 1rem;\">\n"
         "                        <span class=\"box-title\">⚠️ Referencia externa</span>\n"
         "                        <p>Este contenido ha sido estructurado de forma informativa. Puedes consultar los detalles adicionales en la <a href=\"" + url_fuente + "\" target=\"_blank\" rel=\"noopener noreferrer\">fuente original de la noticia</a>.</p>\n"
         "                    </div>\n"
