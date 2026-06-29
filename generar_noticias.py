@@ -135,15 +135,15 @@ FEEDS_FILE = Path("feeds.json")
 def cargar_feeds():
     """Carga la lista de feeds RSS desde feeds.json"""
     feeds_default = [
-        "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
-        "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
-        "https://news.google.com/rss/search?q=TikTok+monetizacion&hl=es&gl=ES&ceid=ES:es",
-        "https://news.google.com/rss/search?q=TikTok+creadores&hl=es&gl=ES&ceid=ES:es",
         "https://www.20minutos.es/rss/tecnologia/",
         "https://feeds.feedburner.com/tubefilterNews",
-        "https://www.socialmediatoday.com/rss.xml",
         "https://techcrunch.com/category/social/feed/",
-        "https://www.theguardian.com/technology/tiktok/rss"
+        "https://www.theguardian.com/technology/tiktok/rss",
+        "https://www.elmundo.es/tecnologia/rss.xml",
+        "https://www.elespanol.com/rss/tecnologia/",
+        "https://www.xataka.com/rss.xml",
+        "https://www.genbeta.com/rss",
+        "https://www.vidaextra.com/rss.xml"
     ]
     
     if FEEDS_FILE.exists():
@@ -278,59 +278,9 @@ def obtener_feed(url):
             fecha_str = item.findtext("pubDate", default="")
             fecha = parsear_fecha(fecha_str) if fecha_str else None
             
-            # Resolver redirecciones para obtener URL real (Google News, etc.)
+            # Solo usar URLs que no sean de Google News (ya que no redirigen correctamente)
             url_real = link.strip()
-            log("   Link original: " + url_real[:80])
-            if url_real and ("google.com" in url_real or "feedproxy" in url_real or "feeds" in url_real):
-                try:
-                    # Primero intentar con HEAD
-                    log("   Intentando HEAD...")
-                    resp_redirect = requests.head(url_real, headers=headers, timeout=10, allow_redirects=True)
-                    log("   HEAD status: " + str(resp_redirect.status_code) + ", URL final: " + resp_redirect.url[:80])
-                    if resp_redirect.status_code < 400 and resp_redirect.url != url_real and "google.com" not in resp_redirect.url:
-                        url_real = resp_redirect.url
-                        log("   ✓ URL resuelta con HEAD: " + url_real[:80])
-                    else:
-                        # Si HEAD no funciona, intentar con GET
-                        log("   Intentando GET...")
-                        resp_redirect = requests.get(url_real, headers=headers, timeout=10, allow_redirects=True)
-                        log("   GET status: " + str(resp_redirect.status_code) + ", URL final: " + resp_redirect.url[:80])
-                        if resp_redirect.status_code < 400 and resp_redirect.url != url_real and "google.com" not in resp_redirect.url:
-                            url_real = resp_redirect.url
-                            log("   ✓ URL resuelta con GET: " + url_real[:80])
-                        elif resp_redirect.status_code < 400 and "google.com" in resp_redirect.url:
-                            # Google News no redirige con HTTP, buscar en el HTML
-                            log("   Google News detectado, buscando en HTML...")
-                            html = resp_redirect.text
-                            # Buscar meta refresh
-                            match = re.search(r'<meta[^>]*http-equiv=["\']refresh["\'][^>]*content=["\']\d+;url=(https?://[^"\']+)["\']', html, re.IGNORECASE)
-                            if match:
-                                url_real = match.group(1)
-                                log("   ✓ URL encontrada en meta refresh: " + url_real[:80])
-                            else:
-                                # Buscar link canonical
-                                match = re.search(r'<link[^>]*rel=["\']canonical["\'][^>]*href=["\'](https?://[^"\']+)["\']', html, re.IGNORECASE)
-                                if match and "google.com" not in match.group(1):
-                                    url_real = match.group(1)
-                                    log("   ✓ URL encontrada en canonical: " + url_real[:80])
-                                else:
-                                    # Buscar cualquier link externo
-                                    matches = re.findall(r'<a[^>]*href=["\'](https?://[^"\']+)["\']', html, re.IGNORECASE)
-                                    for m in matches:
-                                        if "google.com" not in m and "google." not in m:
-                                            url_real = m
-                                            log("   ✓ URL encontrada en link: " + url_real[:80])
-                                            break
-                                    else:
-                                        log("   ✗ No se pudo resolver URL de Google News")
-                        else:
-                            log("   ✗ GET no resolvió la URL")
-                except Exception as e:
-                    log("   ⚠️ Error resolviendo URL: " + str(e))
-            else:
-                log("   URL no requiere resolución")
-            
-            if titulo and url_real:
+            if url_real and "google.com" not in url_real and "feedproxy" not in url_real:
                 items.append({
                     "titulo": titulo.strip(),
                     "url": url_real,
@@ -424,25 +374,25 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
     contenido_web = extraer_contenido_web(url_fuente)
     
     prompt = (
-        "INSTRUCCIÓN ABSOLUTA: Eres un periodista de agencia. Tu trabajo es EXTRAER HECHOS REALES de un texto fuente y redactarlos. "
-        "NO inventes NADA. Si no sabes un dato concreto, NO lo menciones. Prefiere decir menos pero veraz que más pero inventado.\n\n"
+        "INSTRUCCIÓN ABSOLUTA: Eres un PERIODISTA DE AGENCIA. Tu trabajo es LEER el texto fuente, EXTRAER los hechos reales que contiene, y REDACTAR un artículo periodístico completo con esos hechos.\n\n"
+        "REGLAS CRÍTICAS (INCUMPLIR = RESPUESTA INVÁLIDA):\n"
+        "1. NO hagas un resumen. NO condenses la información. REDACTA un artículo completo con TODOS los hechos del texto.\n"
+        "2. NO interpretes, NO añadas tu opinión, NO infieras nada que no esté explícito en el texto.\n"
+        "3. NO inventes nombres, empresas, cifras, fechas, lugares o datos que no aparezcan en el texto fuente.\n"
+        "4. Si el texto no menciona un protagonista, NO inventes uno genérico como 'la plataforma' o 'los expertos'.\n"
+        "5. Si el texto no menciona una fecha concreta, NO inventes 'recientemente' o 'en los últimos días'.\n"
+        "6. PROHIBIDO: 'en el dinámico mundo', 'revolucionario', 'crucial', 'es fundamental', 'un hito', 'fascinante', 'cada vez más', 'en la era digital'.\n"
+        "7. PROHIBIDO usar frases genéricas que no aporten información específica del texto fuente.\n"
+        "8. NO incluyas fuentes, enlaces, ni referencias al final del artículo.\n\n"
+        "REGLAS DE REDACCIÓN:\n"
+        "9. Escribe entre 300-500 palabras (NO menos de 300).\n"
+        "10. Usa 4-6 párrafos con información sustancial en cada uno.\n"
+        "11. Cada párrafo debe contener datos concretos extraídos del texto.\n"
+        "12. Usa <strong> solo para nombres propios, empresas, cifras y datos concretos.\n\n"
         "TEXTO FUENTE (del que debes extraer los hechos):\n"
         "---\n"
         + (contenido_web if contenido_web else descripcion) + "\n"
         "---\n\n"
-        "REGLAS DE EXTRACCIÓN (OBLIGATORIAS):\n"
-        "1. Extrae SOLO nombres de personas, empresas o lugares que APAREZCAN en el texto fuente.\n"
-        "2. Extrae SOLO cifras, fechas o datos numéricos que APAREZCAN en el texto fuente.\n"
-        "3. Extrae SOLO hechos que estén explícitamente mencionados. NO supongas, NO infieras.\n"
-        "4. Si el texto fuente no menciona un protagonista, NO inventes uno genérico como 'la plataforma' o 'los expertos'.\n"
-        "5. Si el texto fuente no menciona una fecha concreta, NO inventes 'recientemente' o 'en los últimos días'.\n\n"
-        "REGLAS DE REDACCIÓN:\n"
-        "6. Escribe entre 250-400 palabras.\n"
-        "7. Usa párrafos cortos (máx 3-4 líneas cada uno).\n"
-        "8. Usa <strong> solo para nombres propios y datos concretos extraídos del texto.\n"
-        "9. PROHIBIDO: 'en el dinámico mundo', 'revolucionario', 'crucial', 'es fundamental', 'un hito', 'fascinante', 'cada vez más', 'en la era digital'.\n"
-        "10. PROHIBIDO usar frases genéricas que no aporten información específica del texto fuente.\n"
-        "11. NO incluyas fuentes, enlaces, ni referencias al final.\n\n"
         "FORMATO DE RESPUESTA (EXACTO):\n"
         "TITULO: <titular con datos concretos, máx 70 caracteres>\n"
         "CONTENIDO: <cuerpo en HTML con <p> y <strong> solo para datos reales>"
