@@ -108,6 +108,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 import requests
+from openai import OpenAI
 
 # Configuración de APIs
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -119,8 +120,12 @@ if GEMINI_API_KEY:
     import google.generativeai as genai
     genai.configure(api_key=GEMINI_API_KEY)
     USAR_GEMINI = True
+    # También inicializar OpenAI como fallback
+    if OPENAI_API_KEY:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+    else:
+        client = None
 elif OPENAI_API_KEY:
-    from openai import OpenAI
     client = OpenAI(api_key=OPENAI_API_KEY)
     USAR_GEMINI = False
 else:
