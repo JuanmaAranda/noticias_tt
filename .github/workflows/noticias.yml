@@ -52,6 +52,11 @@ jobs:
         echo "LINKEDIN_COOKIES está configurado: ${{ secrets.LINKEDIN_COOKIES != '' }}"
         echo "LINKEDIN_CSRF está configurado: ${{ secrets.LINKEDIN_CSRF != '' }}"
 
+    - name: Resetear estado para regenerar todas las noticias
+      run: |
+        rm -f estado_noticias.json
+        echo "Estado reseteado. Se regenerarán todas las noticias desde cero."
+
     - name: Ejecutar generador de noticias
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
