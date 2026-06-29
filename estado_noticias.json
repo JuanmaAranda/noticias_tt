@@ -1,17 +1,19 @@
 {
   "procesados": [
-    "13e418f4a9ddd905d153d93a56522954",
-    "c85f812fe2ffaa3042a3f5aaf66c989e"
+    "9fa617b46702e331d792f53972796eb5",
+    "5194f849bd35559b9d6fdffffd0b1b79"
   ],
-  "ultima_ejecucion": "2026-06-29T17:58:51.625921",
+  "ultima_ejecucion": "2026-06-29T18:41:00.141007",
   "extractos": {
-    "españa-favorita-para-el-mundial-2026-según-un-algoritmo-de-i.html": "Un algoritmo de aprendizaje automático ha situado a España como la gran favorita para ganar el Mundial 2026, superando a selecciones como...",
-    "instagram-mejora-tu-algoritmo-con-nuevas-opciones-de-persona.html": "Instagram está probando nuevas formas de acceder a la configuración de la herramienta 'Tu algoritmo', permitiendo a los usuarios..."
+    "entrepinares-invertirá-más-de-20-millones-en-queso-cottage-e.html": "En abril de 2024, técnicos del servicio estadístico del Departamento de Agricultura de EEUU detectaron un aumento significativo en las...",
+    "tiktok-retransmitirá-la-velada-del-año-vi-el-25-de-julio-en.html": "TikTok ha anunciado que retransmitirá en directo La Velada del Año VI, un evento organizado por Ibai Llanos. Este evento se llevará a cabo..."
   },
   "titulos": [
     "Despido de un camarero por un vídeo de TikTok en horario laboral",
-    "Moncloa designa a un asesor de Sánchez en empresa de Defensa",
     "España, favorita para el Mundial 2026 según un algoritmo de IA",
-    "Instagram mejora 'Tu algoritmo' con nuevas opciones de personalización"
+    "Instagram mejora 'Tu algoritmo' con nuevas opciones de personalización",
+    "Moncloa designa a un asesor de Sánchez en empresa de Defensa",
+    "Entrepinares invertirá más de 20 millones en queso cottage en Lugo",
+    "TikTok retransmitirá La Velada del Año VI el 25 de julio en Sevilla"
   ]
 }
