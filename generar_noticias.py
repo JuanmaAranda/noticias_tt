@@ -1,3 +1,34 @@
+def extraer_contenido_web(url):
+    """Extrae el texto relevante de una página web para usar como contexto."""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        html = resp.text
+        
+        # Eliminar scripts y estilos
+        html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL)
+        html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL)
+        
+        # Extraer texto de párrafos
+        parrafos = re.findall(r'<p[^>]*>(.*?)</p>', html, flags=re.DOTALL)
+        texto = ' '.join(parrafos)
+        
+        # Limpiar HTML residual
+        texto = re.sub(r'<[^>]+>', ' ', texto)
+        texto = re.sub(r'\s+', ' ', texto).strip()
+        
+        # Limitar a 3000 caracteres para no saturar la API
+        if len(texto) > 3000:
+            texto = texto[:3000] + "..."
+        
+        return texto
+    except Exception as e:
+        log("   ⚠️ No se pudo extraer contenido de " + url + ": " + str(e))
+        return ""
+
 def publicar_linkedin(titulo, url_noticia):
     """Publica un post en LinkedIn usando cookies de sesión."""
     LINKEDIN_COOKIES = os.environ.get("LINKEDIN_COOKIES", "")
@@ -77,9 +108,23 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 import requests
-from openai import OpenAI
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-REEMPLAZA-ESTO-CON-TU-API-KEY")
+# Configuración de APIs
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+# Inicializar cliente de IA
+client = None
+if GEMINI_API_KEY:
+    import google.generativeai as genai
+    genai.configure(api_key=GEMINI_API_KEY)
+    USAR_GEMINI = True
+elif OPENAI_API_KEY:
+    from openai import OpenAI
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    USAR_GEMINI = False
+else:
+    USAR_GEMINI = False
 
 FEEDS_FILE = Path("feeds.json")
 
@@ -335,38 +380,64 @@ def generar_extracto(contenido_html, max_chars=140):
     return texto
 
 def generar_articulo_ia(titulo, descripcion, url_fuente):
+    # Extraer contenido real de la web si es posible
+    contenido_web = extraer_contenido_web(url_fuente)
+    
     prompt = (
-        "Eres un periodista tecnológico y redactor SEO experto para la plataforma TikPanel (tikpanel.app).\n\n"
-        "Tu objetivo es redactar una noticia original, informativa y de alto valor periodístico basada en datos externos. "
-        "Google penaliza el contenido genérico, así que debes enfocarte en HECHOS, DATOS, NOMBRES y PROTAGONISTAS reales. "
-        "No inventes cosas que no estén en el texto original, pero extrae y enfatiza cada detalle concreto que encuentres.\n\n"
-        "INFORMACIÓN ORIGINAL EXTRAÍDA DEL FEED:\n"
-        "- Titulo original: " + titulo + "\n"
-        "- Descripción original: " + descripcion + "\n\n"
-        "REGLAS DE REDACCIÓN Y SEO (ESTRICTAS):\n"
-        "1. Enfócate al 100% en los hechos ocurridos. ¿Qué pasó? ¿Quién lo hizo? ¿Cuándo? Evita generalidades.\n"
-        "2. PROHIBIDO usar lenguaje cliché de IA. No uses palabras como: 'en el dinámico mundo', 'revolucionario', 'crucial', 'es fundamental', 'un hito', 'fascinante'. Sé directo y periodístico.\n"
-        "3. Longitud: Entre 300 y 450 palabras organizadas de forma lógica.\n"
-        "4. El artículo debe ser útil para creadores de contenido, streamers y marketers que usan TikTok.\n"
-        "5. NO incluyas fuentes originales, enlaces, ni referencias al final del artículo. El sistema añadirá eso automáticamente.\n\n"
-        "ESTRUCTURA DEL OUTPUT:\n"
-        "- TITULO: Un titular periodístico limpio, optimizado para SEO (máx. 70 caracteres), que incluya palabras clave naturales.\n"
-        "- CONTENIDO: El cuerpo de la noticia en formato HTML puro. Organízalo con etiquetas <p> para párrafos normales. Usa <strong>únicamente</strong> para destacar palabras clave importantes (máx 3-4 por párrafo). Puedes incluir un subtítulo intermedio usando <h3> si ayuda a estructurar el texto.\n\n"
-        "Responde ÚNICAMENTE en este formato estructural exacto:\n"
-        "TITULO: <titular aquí>\n"
-        "CONTENIDO: <cuerpo en HTML aquí>"
+        "INSTRUCCIÓN ABSOLUTA: Eres un periodista de agencia. Tu trabajo es EXTRAER HECHOS REALES de un texto fuente y redactarlos. "
+        "NO inventes NADA. Si no sabes un dato concreto, NO lo menciones. Prefiere decir menos pero veraz que más pero inventado.\n\n"
+        "TEXTO FUENTE (del que debes extraer los hechos):\n"
+        "---\n"
+        + (contenido_web if contenido_web else descripcion) + "\n"
+        "---\n\n"
+        "REGLAS DE EXTRACCIÓN (OBLIGATORIAS):\n"
+        "1. Extrae SOLO nombres de personas, empresas o lugares que APAREZCAN en el texto fuente.\n"
+        "2. Extrae SOLO cifras, fechas o datos numéricos que APAREZCAN en el texto fuente.\n"
+        "3. Extrae SOLO hechos que estén explícitamente mencionados. NO supongas, NO infieras.\n"
+        "4. Si el texto fuente no menciona un protagonista, NO inventes uno genérico como 'la plataforma' o 'los expertos'.\n"
+        "5. Si el texto fuente no menciona una fecha concreta, NO inventes 'recientemente' o 'en los últimos días'.\n\n"
+        "REGLAS DE REDACCIÓN:\n"
+        "6. Escribe entre 250-400 palabras.\n"
+        "7. Usa párrafos cortos (máx 3-4 líneas cada uno).\n"
+        "8. Usa <strong> solo para nombres propios y datos concretos extraídos del texto.\n"
+        "9. PROHIBIDO: 'en el dinámico mundo', 'revolucionario', 'crucial', 'es fundamental', 'un hito', 'fascinante', 'cada vez más', 'en la era digital'.\n"
+        "10. PROHIBIDO usar frases genéricas que no aporten información específica del texto fuente.\n"
+        "11. NO incluyas fuentes, enlaces, ni referencias al final.\n\n"
+        "FORMATO DE RESPUESTA (EXACTO):\n"
+        "TITULO: <titular con datos concretos, máx 70 caracteres>\n"
+        "CONTENIDO: <cuerpo en HTML con <p> y <strong> solo para datos reales>"
     )
+    
     try:
-        respuesta = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "Eres un redactor SEO y periodista de tecnología. Escribes con un tono informativo, directo, sin introducciones vacías ni palabras cliché de IA. Usas exclusivamente etiquetas HTML (<p>, <strong>, <h3>)."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.4,
-            max_tokens=1500,
-        )
-        texto = respuesta.choices[0].message.content.strip()
+        if USAR_GEMINI and GEMINI_API_KEY:
+            # Usar Gemini
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.1,  # Muy bajo para evitar inventos
+                    max_output_tokens=1500,
+                )
+            )
+            texto = response.text.strip()
+        elif client:
+            # Fallback a OpenAI
+            respuesta = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Eres un periodista de agencia. Extraes hechos reales de textos fuente sin inventar nada. Si no hay dato concreto, no lo menciones."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,
+                max_tokens=1500,
+            )
+            texto = respuesta.choices[0].message.content.strip()
+        else:
+            # Sin API disponible
+            log("⚠️ No hay API de IA disponible, usando descripción como contenido")
+            return titulo, "<p>" + descripcion + "</p>"
+        
+        # Extraer título y contenido
         titulo_match = re.search(r"TITULO:\s*(.+?)(?=\n|CONTENIDO:)", texto, re.DOTALL)
         contenido_match = re.search(r"CONTENIDO:\s*(.+)", texto, re.DOTALL)
         nuevo_titulo = titulo_match.group(1).strip() if titulo_match else titulo
@@ -376,7 +447,7 @@ def generar_articulo_ia(titulo, descripcion, url_fuente):
         contenido = limpiar_fuentes(contenido)
         return nuevo_titulo, contenido
     except Exception as e:
-        log("Error con OpenAI: " + str(e))
+        log("Error con la IA: " + str(e))
         contenido_fallback = "<p>" + descripcion + "</p>"
         return titulo, contenido_fallback
 
