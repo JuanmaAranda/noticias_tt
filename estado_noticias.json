@@ -1,29 +1,31 @@
 {
   "procesados": [
-    "4a5f3a5e420d768f38fc9bff939fd201",
     "f8c391263444121152a78cb04d72787d",
-    "8c86b903dc1cacd23a65cbf077ded719",
-    "adde1737960005d43941772e10921c32",
-    "f08e550f6b260fe90426d2118f745a2b",
-    "c5cf749c9eef427109dce529c55d93ba",
-    "f0539f85204b7ccbe754b410f491cc99",
-    "9be2abfa55705fb9ee55efe70d5c212a",
     "8bbebdd4dbd48e8e5514ed81d4f7b83b",
-    "2263da38c7cc8908711e811cc8176520",
+    "f08e550f6b260fe90426d2118f745a2b",
+    "adde1737960005d43941772e10921c32",
+    "1db6c8d3bb9ed92bc295f791b6b1e491",
+    "f0539f85204b7ccbe754b410f491cc99",
     "2d2c6abfabbe8b134a354f97fe726698",
-    "00aa5b77f36a141bc3b7528eb328c669",
+    "f5233b065dbd1ee5f1ce43049d407bdd",
+    "b58b2f0ada79cdf6a488dfe8bf480263",
+    "cc812b55e0732c37ac28dda9a7a1cbc4",
+    "2263da38c7cc8908711e811cc8176520",
+    "c80a6f697823b31edd74f5335c26422d",
     "63dbb6423eb9319904fb068399b5d01c",
     "004a40b5858d7cb3afbc4f72b1fc0f9f",
-    "c80a6f697823b31edd74f5335c26422d",
-    "9697fcea3ccbb427b2d61fe907116ae1",
-    "80d03071b5e1b30ac04b0639736ccd0d",
-    "f5233b065dbd1ee5f1ce43049d407bdd",
-    "20e5a3829de2b007b308f310d15b0129",
-    "1db6c8d3bb9ed92bc295f791b6b1e491",
     "26d4862d078b2183e876e3a376311b4e",
-    "b58b2f0ada79cdf6a488dfe8bf480263"
+    "9be2abfa55705fb9ee55efe70d5c212a",
+    "8c86b903dc1cacd23a65cbf077ded719",
+    "4a5f3a5e420d768f38fc9bff939fd201",
+    "20e5a3829de2b007b308f310d15b0129",
+    "49df48e250760e8bcd163a73e57b6266",
+    "9697fcea3ccbb427b2d61fe907116ae1",
+    "00aa5b77f36a141bc3b7528eb328c669",
+    "c5cf749c9eef427109dce529c55d93ba",
+    "80d03071b5e1b30ac04b0639736ccd0d"
   ],
-  "ultima_ejecucion": "2026-06-28T19:02:46.501945",
+  "ultima_ejecucion": "2026-06-29T09:33:05.395464",
   "extractos": {
     "mujer-compra-casa-en-italia-por-1-euro-y-se-vuelve-viral-en.html": "Una mujer ha captado la atención de millones de usuarios en TikTok tras compartir su increíble experiencia al comprar una casa en Italia...",
     "la-favela-brasileña-que-transformó-armas-en-tecnología-viral.html": "En un giro sorprendente, una favela de Brasil, anteriormente conocida como epicentro de actividades delictivas, ha dado un paso hacia la...",
@@ -43,7 +45,9 @@
     "casi-el-60-de-los-vídeos-en-tiktok-para-nuevos-usuarios-son.html": "Un reciente estudio revela que casi el 60% de los vídeos que TikTok presenta a nuevos usuarios y niños son generados mediante inteligencia...",
     "tiktok-impulsa-el-flamenco-entre-los-jóvenes-en-sevilla.html": "La plataforma TikTok ha jugado un papel significativo en la revitalización del flamenco entre las nuevas generaciones. Según un artículo de...",
     "youtube-lanza-nueva-función-en-shorts-para-competir-con-tikt.html": "YouTube ha introducido un nuevo modo de pantalla limpia en su plataforma de Shorts, diseñado específicamente para mejorar la experiencia...",
-    "viral-en-tiktok-cliente-casado-pierde-relación-tras-foto-del.html": "Un reciente caso viral en TikTok ha captado la atención de miles de usuarios, generando debate sobre la ética en la comunicación digital...."
+    "viral-en-tiktok-cliente-casado-pierde-relación-tras-foto-del.html": "Un reciente caso viral en TikTok ha captado la atención de miles de usuarios, generando debate sobre la ética en la comunicación digital....",
+    "la-miniserie-los-vecinos-llega-a-youtube-y-tiktok-con-priego.html": "La miniserie 'Los Vecinos' ha dado un paso significativo al expandir su presencia en plataformas digitales, lanzándose en YouTube y TikTok....",
+    "las-brumas-perfumadas-de-sephora-se-agotan-por-la-viralidad.html": "Las brumas perfumadas han cobrado una popularidad inesperada en el mercado de la belleza, especialmente en Sephora, donde varios de estos..."
   },
   "titulos": [
     "Casi el 60% de los vídeos en TikTok para nuevos usuarios son generados por IA",
@@ -64,8 +68,10 @@
     "TikTok y sus vídeos de terror: los contenidos perturbadores ocultos",
     "Tiktoker británica en riesgo de ejecución por homicidio en Dubái",
     "Viral en TikTok: Cliente casado pierde a su asesora tras un mensaje",
-    "YouTube lanza nuevas funciones en Shorts para competir con TikTok",
+    "Viral en TikTok: Cliente casado pierde relación tras foto del Mundial",
     "YouTube lanza nueva función en Shorts para competir con TikTok",
-    "Viral en TikTok: Cliente casado pierde relación tras foto del Mundial"
+    "YouTube lanza nuevas funciones en Shorts para competir con TikTok",
+    "La miniserie 'Los Vecinos' llega a YouTube y TikTok con Priego Digital",
+    "Las brumas perfumadas de Sephora se agotan por la viralidad en TikTok"
   ]
 }
