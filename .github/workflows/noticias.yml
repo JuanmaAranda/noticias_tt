@@ -31,15 +31,22 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Descargar lista de borradas desde el servidor
+    - name: Descargar lista de borradas y pendientes desde el servidor
       continue-on-error: true
       timeout-minutes: 1
       run: |
         curl -fsSL --connect-timeout 10 -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt"
+        # Descargar pendientes.json del servidor para no duplicar
+        curl -fsSL --connect-timeout 10 -o pendientes.json "https://tikpanel.app/panel/pendientes.json" && echo "pendientes.json descargado del servidor" || echo "No hay pendientes.json en el servidor, iniciando desde cero"
+        if [ ! -s pendientes.json ]; then
+          echo "[]" > pendientes.json
+          echo "pendientes.json inicializado vacío"
+        fi
 
     - name: Verificar secrets
       run: |
-        echo "NEWSAPI_KEY está configurado: ${{ secrets.NEWSAPI_KEY != '' }}"
+        echo "OPENAI_API_KEY está configurado: ${{ secrets.OPENAI_API_KEY != '' }}"
+        echo "GEMINI_API_KEY está configurado: ${{ secrets.GEMINI_API_KEY != '' }}"
 
     - name: Ejecutar recolector de noticias
       env:
@@ -82,7 +89,7 @@ jobs:
           <p><strong>Errores:</strong> ${{ steps.resumen.outputs.errores }}</p>
           <p><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">Ver detalles en GitHub Actions</a></p>
 
-    - name: Commit y push de pendientes.json
+    - name: Commit y push de pendientes.json al repo (backup)
       run: |
         git config user.name "TikPanel Bot"
         git config user.email "bot@tikpanel.app"
@@ -93,6 +100,31 @@ jobs:
           git commit -m "🤖 URLs pendientes actualizadas: $(date +%Y-%m-%d)"
           git push
         fi
+
+    - name: Instalar lftp
+      run: sudo apt-get install -y lftp
+
+    - name: Subir pendientes.json al servidor por FTP
+      continue-on-error: true
+      run: |
+        lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
+        set ssl:verify-certificate no
+        set net:timeout 30
+        set net:max-retries 2
+        put pendientes.json -o /panel/pendientes.json
+        bye
+        " || echo "⚠️ FTP falló, pero pendientes.json está en GitHub"
+
+    - name: Subir noticias por FTP (si hay cambios)
+      continue-on-error: true
+      run: |
+        lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
+        set ssl:verify-certificate no
+        set net:timeout 30
+        set net:max-retries 2
+        mirror -R -p noticias/ /noticias/
+        bye
+        " || echo "⚠️ FTP de noticias falló"
 
     - name: Instalar lftp
       run: sudo apt-get install -y lftp
