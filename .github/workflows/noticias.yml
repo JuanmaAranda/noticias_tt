@@ -31,26 +31,17 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Descargar lista de borradas y feeds desde el servidor
+    - name: Descargar lista de borradas desde el servidor
+      continue-on-error: true
+      timeout-minutes: 1
       run: |
-        # Descargar borradas.txt
-        curl -fsSL -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt"
-        # Descargar feeds.json con seguimiento de redirecciones
-        echo "Descargando feeds.json..."
-        curl -fsSL -o feeds.json "https://tikpanel.app/feeds.json" && echo "feeds.json descargado correctamente" || echo "No se pudo descargar feeds.json, usando por defecto"
-        # Verificar contenido
-        if [ -s feeds.json ]; then
-          echo "Contenido de feeds.json:"
-          cat feeds.json | head -5
-        else
-          rm -f feeds.json
-          echo "feeds.json vacío o no descargado, se usarán feeds por defecto"
-        fi
+        curl -fsSL --connect-timeout 10 -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt"
 
     - name: Verificar secrets
       run: |
         echo "LINKEDIN_COOKIES está configurado: ${{ secrets.LINKEDIN_COOKIES != '' }}"
         echo "LINKEDIN_CSRF está configurado: ${{ secrets.LINKEDIN_CSRF != '' }}"
+        echo "NEWSAPI_KEY está configurado: ${{ secrets.NEWSAPI_KEY != '' }}"
 
     - name: Resetear estado para regenerar todas las noticias
       run: |

@@ -2,15 +2,37 @@ def extraer_contenido_web(url):
     """Extrae el texto relevante de una página web para usar como contexto."""
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
         }
-        resp = requests.get(url, headers=headers, timeout=15)
+        resp = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
+        
+        # Si devuelve 403, intentar con headers mínimos
+        if resp.status_code == 403:
+            headers_min = {
+                "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+            }
+            resp = requests.get(url, headers=headers_min, timeout=15, allow_redirects=True)
+        
         resp.raise_for_status()
         html = resp.text
         
         # Eliminar scripts y estilos
         html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL)
         html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL)
+        html = re.sub(r'<nav[^>]*>.*?</nav>', '', html, flags=re.DOTALL)
+        html = re.sub(r'<footer[^>]*>.*?</footer>', '', html, flags=re.DOTALL)
+        html = re.sub(r'<header[^>]*>.*?</header>', '', html, flags=re.DOTALL)
         
         # Extraer texto de párrafos
         parrafos = re.findall(r'<p[^>]*>(.*?)</p>', html, flags=re.DOTALL)
