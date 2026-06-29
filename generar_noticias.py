@@ -279,24 +279,10 @@ def obtener_feed(url):
             
             url_real = link.strip()
             
-            # Si es Google News, usar r.jina.ai para extraer el texto real
-            if url_real and "google.com" in url_real:
-                try:
-                    # r.jina.ai puede extraer texto de Google News URLs
-                    jina_url = "https://r.jina.ai/http://" + url_real.replace("https://", "").replace("http://", "")
-                    resp_jina = requests.get(jina_url, headers=headers, timeout=15)
-                    if resp_jina.status_code == 200:
-                        # El texto extraído se usará como descripción
-                        texto_jina = resp_jina.text.strip()
-                        if len(texto_jina) > 200:
-                            desc = texto_jina[:2000]  # Usar como descripción/contexto
-                            log("   ✓ Texto extraído con r.jina.ai: " + str(len(texto_jina)) + " chars")
-                        else:
-                            log("   ✗ Texto de r.jina.ai muy corto")
-                    else:
-                        log("   ✗ r.jina.ai falló: HTTP " + str(resp_jina.status_code))
-                except Exception as e:
-                    log("   ⚠️ Error con r.jina.ai: " + str(e))
+            # Solo procesar noticias que mencionen TikTok en el título o descripción
+            texto_completo = (titulo + " " + desc).lower()
+            if "tiktok" not in texto_completo and "tik tok" not in texto_completo and "byte dance" not in texto_completo:
+                continue
             
             if titulo and url_real:
                 items.append({
