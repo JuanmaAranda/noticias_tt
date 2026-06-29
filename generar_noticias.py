@@ -280,15 +280,34 @@ def obtener_feed(url):
                 try:
                     # Primero intentar con HEAD
                     resp_redirect = requests.head(url_real, headers=headers, timeout=10, allow_redirects=True)
-                    if resp_redirect.status_code < 400 and resp_redirect.url != url_real:
+                    if resp_redirect.status_code < 400 and resp_redirect.url != url_real and "google.com" not in resp_redirect.url:
                         url_real = resp_redirect.url
                     else:
                         # Si HEAD no funciona, intentar con GET
                         resp_redirect = requests.get(url_real, headers=headers, timeout=10, allow_redirects=True)
-                        if resp_redirect.status_code < 400 and resp_redirect.url != url_real:
+                        if resp_redirect.status_code < 400 and resp_redirect.url != url_real and "google.com" not in resp_redirect.url:
                             url_real = resp_redirect.url
-                except Exception:
-                    pass
+                        elif resp_redirect.status_code < 400 and "google.com" in resp_redirect.url:
+                            # Google News no redirige con HTTP, buscar en el HTML
+                            html = resp_redirect.text
+                            # Buscar meta refresh
+                            match = re.search(r'<meta[^>]*http-equiv=["\']refresh["\'][^>]*content=["\']\d+;url=(https?://[^"\']+)["\']', html, re.IGNORECASE)
+                            if match:
+                                url_real = match.group(1)
+                            else:
+                                # Buscar link canonical
+                                match = re.search(r'<link[^>]*rel=["\']canonical["\'][^>]*href=["\'](https?://[^"\']+)["\']', html, re.IGNORECASE)
+                                if match and "google.com" not in match.group(1):
+                                    url_real = match.group(1)
+                                else:
+                                    # Buscar cualquier link externo
+                                    matches = re.findall(r'<a[^>]*href=["\'](https?://[^"\']+)["\']', html, re.IGNORECASE)
+                                    for m in matches:
+                                        if "google.com" not in m and "google." not in m:
+                                            url_real = m
+                                            break
+                except Exception as e:
+                    log("   ⚠️ Error resolviendo URL: " + str(e))
             
             if titulo and url_real:
                 items.append({
