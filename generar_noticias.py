@@ -280,38 +280,55 @@ def obtener_feed(url):
             
             # Resolver redirecciones para obtener URL real (Google News, etc.)
             url_real = link.strip()
+            log("   Link original: " + url_real[:80])
             if url_real and ("google.com" in url_real or "feedproxy" in url_real or "feeds" in url_real):
                 try:
                     # Primero intentar con HEAD
+                    log("   Intentando HEAD...")
                     resp_redirect = requests.head(url_real, headers=headers, timeout=10, allow_redirects=True)
+                    log("   HEAD status: " + str(resp_redirect.status_code) + ", URL final: " + resp_redirect.url[:80])
                     if resp_redirect.status_code < 400 and resp_redirect.url != url_real and "google.com" not in resp_redirect.url:
                         url_real = resp_redirect.url
+                        log("   ✓ URL resuelta con HEAD: " + url_real[:80])
                     else:
                         # Si HEAD no funciona, intentar con GET
+                        log("   Intentando GET...")
                         resp_redirect = requests.get(url_real, headers=headers, timeout=10, allow_redirects=True)
+                        log("   GET status: " + str(resp_redirect.status_code) + ", URL final: " + resp_redirect.url[:80])
                         if resp_redirect.status_code < 400 and resp_redirect.url != url_real and "google.com" not in resp_redirect.url:
                             url_real = resp_redirect.url
+                            log("   ✓ URL resuelta con GET: " + url_real[:80])
                         elif resp_redirect.status_code < 400 and "google.com" in resp_redirect.url:
                             # Google News no redirige con HTTP, buscar en el HTML
+                            log("   Google News detectado, buscando en HTML...")
                             html = resp_redirect.text
                             # Buscar meta refresh
                             match = re.search(r'<meta[^>]*http-equiv=["\']refresh["\'][^>]*content=["\']\d+;url=(https?://[^"\']+)["\']', html, re.IGNORECASE)
                             if match:
                                 url_real = match.group(1)
+                                log("   ✓ URL encontrada en meta refresh: " + url_real[:80])
                             else:
                                 # Buscar link canonical
                                 match = re.search(r'<link[^>]*rel=["\']canonical["\'][^>]*href=["\'](https?://[^"\']+)["\']', html, re.IGNORECASE)
                                 if match and "google.com" not in match.group(1):
                                     url_real = match.group(1)
+                                    log("   ✓ URL encontrada en canonical: " + url_real[:80])
                                 else:
                                     # Buscar cualquier link externo
                                     matches = re.findall(r'<a[^>]*href=["\'](https?://[^"\']+)["\']', html, re.IGNORECASE)
                                     for m in matches:
                                         if "google.com" not in m and "google." not in m:
                                             url_real = m
+                                            log("   ✓ URL encontrada en link: " + url_real[:80])
                                             break
+                                    else:
+                                        log("   ✗ No se pudo resolver URL de Google News")
+                        else:
+                            log("   ✗ GET no resolvió la URL")
                 except Exception as e:
                     log("   ⚠️ Error resolviendo URL: " + str(e))
+            else:
+                log("   URL no requiere resolución")
             
             if titulo and url_real:
                 items.append({
