@@ -1,15 +1,17 @@
 {
   "procesados": [
-    "8bbebdd4dbd48e8e5514ed81d4f7b83b",
-    "fb51e6fcca4e671133b0f19efa8a38a8"
+    "13e418f4a9ddd905d153d93a56522954",
+    "c85f812fe2ffaa3042a3f5aaf66c989e"
   ],
-  "ultima_ejecucion": "2026-06-29T17:49:30.411595",
+  "ultima_ejecucion": "2026-06-29T17:58:51.625921",
   "extractos": {
-    "despido-de-un-camarero-por-un-vídeo-de-tiktok-en-horario-lab.html": "Se ha confirmado el despido de un camarero debido a un vídeo de TikTok que fue grabado durante su horario laboral. Este incidente ha...",
-    "moncloa-designa-a-un-asesor-de-sánchez-en-empresa-de-defensa.html": "Moncloa ha nombrado a un asesor cercano al presidente Sánchez en una empresa pública del sector de Defensa. El nuevo cargo se relaciona con..."
+    "españa-favorita-para-el-mundial-2026-según-un-algoritmo-de-i.html": "Un algoritmo de aprendizaje automático ha situado a España como la gran favorita para ganar el Mundial 2026, superando a selecciones como...",
+    "instagram-mejora-tu-algoritmo-con-nuevas-opciones-de-persona.html": "Instagram está probando nuevas formas de acceder a la configuración de la herramienta 'Tu algoritmo', permitiendo a los usuarios..."
   },
   "titulos": [
     "Despido de un camarero por un vídeo de TikTok en horario laboral",
-    "Moncloa designa a un asesor de Sánchez en empresa de Defensa"
+    "Moncloa designa a un asesor de Sánchez en empresa de Defensa",
+    "España, favorita para el Mundial 2026 según un algoritmo de IA",
+    "Instagram mejora 'Tu algoritmo' con nuevas opciones de personalización"
   ]
 }
