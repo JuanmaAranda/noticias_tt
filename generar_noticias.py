@@ -133,27 +133,67 @@ else:
 FEEDS_FILE = Path("feeds.json")
 
 def cargar_feeds():
-    """Carga la lista de feeds RSS desde feeds.json"""
-    feeds_default = [
-        "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
-        "https://news.google.com/rss/search?q=TikTok+algoritmo&hl=es&gl=ES&ceid=ES:es",
-        "https://news.google.com/rss/search?q=TikTok+monetizacion&hl=es&gl=ES&ceid=ES:es",
-        "https://news.google.com/rss/search?q=TikTok+creadores&hl=es&gl=ES&ceid=ES:es",
-        "https://www.20minutos.es/rss/tecnologia/",
-        "https://feeds.feedburner.com/tubefilterNews",
-        "https://techcrunch.com/category/social/feed/",
-        "https://www.theguardian.com/technology/tiktok/rss"
-    ]
+    """Carga la lista de feeds RSS desde feeds.json (ahora obsoleto, usamos NewsAPI)"""
+    return []
+
+def obtener_noticias_newsapi():
+    """Obtiene noticias sobre TikTok usando NewsAPI."""
+    NEWSAPI_KEY = os.environ.get("NEWSAPI_KEY", "")
+    if not NEWSAPI_KEY:
+        log("[ERROR] No hay NEWSAPI_KEY configurada")
+        return []
     
-    if FEEDS_FILE.exists():
-        try:
-            with open(FEEDS_FILE, "r", encoding="utf-8") as f:
-                contenido = f.read().strip()
-                if contenido:
-                    return json.load(f)
-        except (json.JSONDecodeError, ValueError) as e:
-            log("⚠️ Error leyendo feeds.json: " + str(e) + ", usando feeds por defecto")
-    return feeds_default
+    try:
+        fecha_hace_7_dias = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+        
+        url = "https://newsapi.org/v2/everything"
+        params = {
+            "q": "TikTok",
+            "from": fecha_hace_7_dias,
+            "to": datetime.now().strftime('%Y-%m-%d'),
+            "language": "es",
+            "sortBy": "relevancy",
+            "pageSize": 20,
+            "apiKey": NEWSAPI_KEY
+        }
+        
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, params=params, headers=headers, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        if data.get("status") != "ok":
+            log("[ERROR] NewsAPI error: " + data.get("message", "Unknown error"))
+            return []
+        
+        items = []
+        for article in data.get("articles", []):
+            titulo = article.get("title", "")
+            url_articulo = article.get("url", "")
+            desc = article.get("description", "") or ""
+            fecha_str = article.get("publishedAt", "")
+            
+            try:
+                fecha = datetime.strptime(fecha_str, "%Y-%m-%dT%H:%M:%SZ") if fecha_str else None
+            except ValueError:
+                fecha = None
+            
+            if titulo and url_articulo and "tiktok" in titulo.lower():
+                items.append({
+                    "titulo": titulo.strip(),
+                    "url": url_articulo.strip(),
+                    "descripcion": desc.strip(),
+                    "fecha": fecha,
+                    "fecha_str": fecha_str,
+                    "fuente": "newsapi",
+                })
+        
+        log("[OK] NewsAPI: " + str(len(items)) + " noticias sobre TikTok encontradas")
+        return items
+        
+    except Exception as e:
+        log("[ERROR] NewsAPI: " + str(e))
+        return []
 
 KEYWORDS = [
     "tiktok", "tik tok", "bytedance", "algorithm", "algoritmo",
@@ -264,39 +304,8 @@ def parsear_fecha(fecha_str):
     return None
 
 def obtener_feed(url):
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url, headers=headers, timeout=20)
-        resp.raise_for_status()
-        root = ET.fromstring(resp.content)
-        items = []
-        for item in root.findall(".//item"):
-            titulo = item.findtext("title", default="")
-            link = item.findtext("link", default="")
-            desc = item.findtext("description", default="")
-            fecha_str = item.findtext("pubDate", default="")
-            fecha = parsear_fecha(fecha_str) if fecha_str else None
-            
-            url_real = link.strip()
-            
-            # Solo procesar noticias que mencionen TikTok en el título o descripción
-            texto_completo = (titulo + " " + desc).lower()
-            if "tiktok" not in texto_completo and "tik tok" not in texto_completo and "byte dance" not in texto_completo:
-                continue
-            
-            if titulo and url_real:
-                items.append({
-                    "titulo": titulo.strip(),
-                    "url": url_real,
-                    "descripcion": desc.strip(),
-                    "fecha": fecha,
-                    "fecha_str": fecha_str,
-                    "fuente": url,
-                })
-        return items
-    except Exception as e:
-        log("Error leyendo feed " + url + ": " + str(e))
-        return []
+    """Obtiene noticias de una fuente RSS (ahora obsoleto, usamos NewsAPI)."""
+    return []
 
 def cargar_estado():
     if ESTADO_FILE.exists():
