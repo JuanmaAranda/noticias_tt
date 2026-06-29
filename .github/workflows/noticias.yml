@@ -61,6 +61,7 @@ jobs:
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
         LINKEDIN_COOKIES: ${{ secrets.LINKEDIN_COOKIES }}
         LINKEDIN_CSRF: ${{ secrets.LINKEDIN_CSRF }}
       run: |

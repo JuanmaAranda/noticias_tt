@@ -705,15 +705,14 @@ def main():
         if slug in extractos:
             del extractos[slug]
 
-    # Cargar feeds desde archivo
-    feeds = cargar_feeds()
-    log("📡 " + str(len(feeds)) + " fuente(s) RSS configurada(s)")
-
-    todas_noticias = []
-    for feed_url in feeds:
-        log("Leyendo feed: " + feed_url)
-        items = obtener_feed(feed_url)
-        todas_noticias.extend(items)
+    # Cargar feeds desde NewsAPI (en lugar de RSS)
+    log("📡 Consultando NewsAPI para noticias sobre TikTok...")
+    todas_noticias = obtener_noticias_newsapi()
+    
+    if not todas_noticias:
+        log("No se encontraron noticias en NewsAPI. Saliendo.")
+        guardar_estado(estado)
+        return
 
     ahora = datetime.now()
     limite = ahora - timedelta(days=7)
