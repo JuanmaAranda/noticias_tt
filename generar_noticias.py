@@ -53,68 +53,9 @@ def extraer_contenido_web(url):
 
 def publicar_linkedin(titulo, url_noticia):
     """Publica un post en LinkedIn usando cookies de sesión."""
-    LINKEDIN_COOKIES = os.environ.get("LINKEDIN_COOKIES", "")
-    LINKEDIN_CSRF = os.environ.get("LINKEDIN_CSRF", "")
-    
-    if not LINKEDIN_COOKIES or not LINKEDIN_CSRF:
-        log("   ⚠️ LinkedIn: No hay cookies configuradas, saltando publicación")
-        return False
-    
-    headers = {
-        "accept": "application/vnd.linkedin.normalized+json+2.1",
-        "content-type": "application/json",
-        "cookie": LINKEDIN_COOKIES,
-        "csrf-token": LINKEDIN_CSRF,
-        "x-restli-protocol-version": "2.0.0",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-    }
-    
-    payload = {
-        "visibility": {
-            "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-        },
-        "lifecycleState": "PUBLISHED",
-        "specificContent": {
-            "com.linkedin.ugc.ShareContent": {
-                "shareCommentary": {
-                    "text": f"📰 {titulo}\n\nLee el artículo completo en:\n{url_noticia}"
-                },
-                "shareMediaCategory": "ARTICLE",
-                "media": [
-                    {
-                        "status": "READY",
-                        "description": {
-                            "text": "Noticias diarias sobre TikTok, algoritmo y creadores de contenido."
-                        },
-                        "originalUrl": url_noticia,
-                        "title": {
-                            "text": titulo
-                        }
-                    }
-                ]
-            }
-        }
-    }
-    
-    try:
-        resp = requests.post(
-            "https://www.linkedin.com/voyager/api/ugcPosts",
-            headers=headers,
-            json=payload,
-            timeout=20
-        )
-        if resp.status_code in (200, 201):
-            log("   ✅ LinkedIn: Publicado correctamente")
-            return True
-        elif resp.status_code == 401 or resp.status_code == 403:
-            log("   ⚠️ LinkedIn: Cookies expiradas o inválidas (revisa LINKEDIN_COOKIES)")
-            return False
-        else:
-            log("   ⚠️ LinkedIn: Error " + str(resp.status_code) + " - " + resp.text[:200])
-            return False
-    except Exception as e:
-        log("   ⚠️ LinkedIn: Error de conexión - " + str(e))
-        return False
+    # Desactivado: las cookies de LinkedIn expiran constantemente y nunca funcionaron bien
+    log("   ⏭ LinkedIn: Publicación desactivada")
+    return False
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
