@@ -62,6 +62,100 @@ def guardar_pendientes(pendientes):
     with open(PENDIENTES_FILE, "w", encoding="utf-8") as f:
         json.dump(pendientes, f, ensure_ascii=False, indent=2)
 
+def cargar_titulos_publicados():
+    """Extrae títulos de noticias ya publicadas desde los archivos HTML en noticias/"""
+    titulos = []
+    for html_file in NOTICIAS_DIR.glob("*.html"):
+        if html_file.name == "index.html":
+            continue
+        try:
+            with open(html_file, "r", encoding="utf-8") as f:
+                html = f.read()
+                # Extraer título del <title> tag
+                match = re.search(r"<title>(.+?)\s*\|", html)
+                if match:
+                    titulos.append(match.group(1).strip())
+        except Exception:
+            pass
+    return titulos
+
+def cargar_titulos_borradas():
+    """Carga títulos de noticias borradas desde borradas.txt si existe"""
+    titulos = []
+    borradas_file = Path("panel/borradas.txt")
+    if borradas_file.exists():
+        try:
+            with open(borradas_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and line.endswith(".html"):
+                        # El archivo borrado es un slug, no tenemos el título
+                        # Pero podemos intentar leerlo del estado si existe
+                        pass
+        except Exception:
+            pass
+    return titulos
+
+def normalizar_texto(texto):
+    if not texto:
+        return ""
+    texto = texto.lower()
+    texto = re.sub(r"[^\w\s]", "", texto)
+    texto = re.sub(r"\s+", " ", texto).strip()
+    return texto
+
+def es_noticia_duplicada(nuevo_titulo, titulos_existentes):
+    """Usa OpenAI para determinar si una noticia nueva es conceptualmente un duplicado de alguna existente."""
+    if not titulos_existentes:
+        return False
+    
+    if not OPENAI_API_KEY or not client:
+        # Sin API, usar comparación simple por palabras clave
+        nuevo_norm = normalizar_texto(nuevo_titulo)
+        for titulo in titulos_existentes:
+            existente_norm = normalizar_texto(titulo)
+            # Si comparten más del 60% de palabras significativas, es duplicado
+            nuevo_palabras = set(nuevo_norm.split())
+            existente_palabras = set(existente_norm.split())
+            if len(nuevo_palabras) > 0:
+                interseccion = nuevo_palabras & existente_palabras
+                union = nuevo_palabras | existente_palabras
+                similitud = len(interseccion) / len(union)
+                if similitud > 0.6:
+                    return True
+        return False
+    
+    # Con OpenAI: comparar solo con los últimos 30 títulos para no gastar tokens
+    titulos_recientes = titulos_existentes[-30:]
+    contexto = "\n".join([f"- {t}" for t in titulos_recientes])
+    
+    prompt = (
+        "Eres un editor de noticias. Determina si la siguiente noticia NUEVA trata sobre "
+        "EL MISMO TEMA o HECHO que alguna de las YA PUBLICADAS, aunque esté redactada con palabras diferentes.\n\n"
+        "NOTICIAS YA PUBLICADAS (últimas 30):\n"
+        f"{contexto}\n\n"
+        f"NUEVA NOTICIA: {nuevo_titulo}\n\n"
+        "Responde ÚNICAMENTE con 'DUPLICADO' si trata del mismo tema/hecho, "
+        "o 'NUEVO' si es un tema completamente diferente.\n"
+        "Respuesta:"
+    )
+    
+    try:
+        respuesta = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Solo respondes 'DUPLICADO' o 'NUEVO'."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0,
+            max_tokens=5
+        )
+        veredicto = respuesta.choices[0].message.content.strip().upper()
+        return "DUPLICADO" in veredicto
+    except Exception as e:
+        log("   ⚠️ Error en deduplicación por IA: " + str(e))
+        return False
+
 def parsear_fecha(fecha_str):
     formatos = [
         "%a, %d %b %Y %H:%M:%S %z",
@@ -122,6 +216,11 @@ def main():
     pendientes = cargar_pendientes()
     urls_existentes = {p["url_google"] for p in pendientes}
     
+    # Cargar títulos de noticias ya publicadas para deduplicación semántica
+    log("Cargando títulos de noticias publicadas...")
+    titulos_publicados = cargar_titulos_publicados()
+    log("  " + str(len(titulos_publicados)) + " noticias publicadas encontradas")
+    
     # Feeds de Google News
     feeds = [
         "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
@@ -149,6 +248,17 @@ def main():
             # Saltar si es muy vieja
             item_fecha = datetime.strptime(item["fecha"], "%Y-%m-%d %H:%M:%S") if item["fecha"] else None
             if item_fecha and item_fecha < limite:
+                continue
+            
+            # Deduplicación semántica: no añadir si es el mismo tema que una ya publicada
+            if es_noticia_duplicada(item["titulo"], titulos_publicados):
+                log("  ⏭ Duplicado semántico (ya publicado): " + item["titulo"][:80])
+                continue
+            
+            # También verificar contra pendientes existentes (por si acaso)
+            titulos_pendientes = [p["titulo"] for p in pendientes]
+            if es_noticia_duplicada(item["titulo"], titulos_pendientes):
+                log("  ⏭ Duplicado semántico (ya en pendientes): " + item["titulo"][:80])
                 continue
             
             pendientes.append(item)
