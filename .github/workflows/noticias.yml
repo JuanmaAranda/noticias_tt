@@ -115,16 +115,22 @@ jobs:
         bye
         " || echo "⚠️ FTP falló, pero pendientes.json está en GitHub"
 
-    - name: Subir noticias por FTP (si hay cambios)
+    - name: Subir noticias por FTP (sin index.html, lo genera el panel)
       continue-on-error: true
       run: |
-        lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
-        set ssl:verify-certificate no
-        set net:timeout 30
-        set net:max-retries 2
-        mirror -R -p noticias/ /noticias/
-        bye
-        " || echo "⚠️ FTP de noticias falló"
+        # Crear lista de archivos a subir (excluyendo index.html)
+        find noticias/ -name "*.html" ! -name "index.html" > /tmp/noticias_files.txt
+        if [ -s /tmp/noticias_files.txt ]; then
+          lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
+          set ssl:verify-certificate no
+          set net:timeout 30
+          set net:max-retries 2
+          mirror -R -p -f /tmp/noticias_files.txt noticias/ /noticias/
+          bye
+          " || echo "⚠️ FTP de noticias falló"
+        else
+          echo "No hay nuevas noticias para subir"
+        fi
 
     - name: Instalar lftp
       run: sudo apt-get install -y lftp
