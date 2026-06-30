@@ -79,6 +79,25 @@ def guardar_ignoradas(ignoradas):
     with open(IGNORADAS_FILE, "w", encoding="utf-8") as f:
         json.dump(ignoradas, f, ensure_ascii=False, indent=2)
 
+def cargar_urls_publicadas():
+    """Extrae URLs de fuente original de noticias ya publicadas desde los archivos HTML"""
+    urls = []
+    for html_file in NOTICIAS_DIR.glob("*.html"):
+        if html_file.name == "index.html":
+            continue
+        try:
+            with open(html_file, "r", encoding="utf-8") as f:
+                html = f.read()
+                # Extraer URL del disclaimer (fuente original)
+                match = re.search(r'<a href="([^"]+)"[^>]*>fuente original', html)
+                if match:
+                    url = match.group(1).strip()
+                    if url and url != "#":
+                        urls.append(url)
+        except Exception:
+            pass
+    return urls
+
 def cargar_titulos_publicados():
     """Extrae títulos de noticias ya publicadas desde los archivos HTML en noticias/"""
     titulos = []
@@ -148,8 +167,8 @@ def es_noticia_duplicada(nuevo_titulo, titulos_existentes):
             union = nuevo_palabras | existente_palabras
             similitud = len(interseccion) / len(union)
             
-            # Si comparten más del 50% de palabras, es duplicado
-            if similitud >= 0.5:
+            # Si comparten más del 30% de palabras, es duplicado
+            if similitud >= 0.3:
                 return True
             
             # Si uno contiene al otro (título muy similar)
@@ -255,6 +274,14 @@ def main():
     ignoradas = cargar_ignoradas()
     urls_ignoradas = {i["url_google"] for i in ignoradas}
     log("  " + str(len(ignoradas)) + " URLs ignoradas (descartadas por el usuario)")
+    
+    # Cargar URLs de noticias ya publicadas para deduplicación por URL
+    log("Cargando URLs de noticias publicadas...")
+    urls_publicadas = cargar_urls_publicadas()
+    log("  " + str(len(urls_publicadas)) + " URLs de fuente encontradas")
+    
+    # Combinar todas las URLs conocidas (ignoradas + publicadas)
+    urls_conocidas = urls_ignoradas | set(urls_publicadas)
     
     # Cargar títulos de noticias ya publicadas para deduplicación semántica
     log("Cargando títulos de noticias publicadas...")
