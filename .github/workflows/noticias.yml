@@ -31,7 +31,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Descargar lista de borradas y pendientes desde el servidor
+    - name: Descargar lista de borradas, pendientes e ignoradas desde el servidor
       continue-on-error: true
       timeout-minutes: 1
       run: |
@@ -41,6 +41,12 @@ jobs:
         if [ ! -s pendientes.json ]; then
           echo "[]" > pendientes.json
           echo "pendientes.json inicializado vacío"
+        fi
+        # Descargar ignoradas.json del servidor
+        curl -fsSL --connect-timeout 10 -o ignoradas.json "https://tikpanel.app/panel/ignoradas.json" && echo "ignoradas.json descargado del servidor" || echo "No hay ignoradas.json en el servidor, iniciando desde cero"
+        if [ ! -s ignoradas.json ]; then
+          echo "[]" > ignoradas.json
+          echo "ignoradas.json inicializado vacío"
         fi
 
     - name: Verificar secrets
@@ -89,22 +95,22 @@ jobs:
           <p><strong>Errores:</strong> ${{ steps.resumen.outputs.errores }}</p>
           <p><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">Ver detalles en GitHub Actions</a></p>
 
-    - name: Commit y push de pendientes.json al repo (backup)
+    - name: Commit y push de pendientes.json e ignoradas.json al repo (backup)
       run: |
         git config user.name "TikPanel Bot"
         git config user.email "bot@tikpanel.app"
-        git add pendientes.json
+        git add pendientes.json ignoradas.json
         if git diff --staged --quiet; then
           echo "No hay cambios nuevos"
         else
-          git commit -m "🤖 URLs pendientes actualizadas: $(date +%Y-%m-%d)"
+          git commit -m "🤖 URLs pendientes e ignoradas actualizadas: $(date +%Y-%m-%d)"
           git push
         fi
 
     - name: Instalar lftp
       run: sudo apt-get install -y lftp
 
-    - name: Subir pendientes.json al servidor por FTP
+    - name: Subir pendientes.json e ignoradas.json al servidor por FTP
       continue-on-error: true
       run: |
         lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
@@ -112,8 +118,9 @@ jobs:
         set net:timeout 30
         set net:max-retries 2
         put pendientes.json -o /panel/pendientes.json
+        put ignoradas.json -o /panel/ignoradas.json
         bye
-        " || echo "⚠️ FTP falló, pero pendientes.json está en GitHub"
+        " || echo "⚠️ FTP falló, pero los archivos están en GitHub"
 
     - name: Subir noticias por FTP (sin index.html, lo genera el panel)
       continue-on-error: true

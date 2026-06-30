@@ -26,6 +26,7 @@ else:
     print("[ERROR] No hay OPENAI_API_KEY configurada.")
 
 PENDIENTES_FILE = Path("pendientes.json")
+IGNORADAS_FILE = Path("ignoradas.json")
 NOTICIAS_DIR = Path("noticias")
 NOTICIAS_DIR.mkdir(exist_ok=True)
 
@@ -61,6 +62,22 @@ def cargar_pendientes():
 def guardar_pendientes(pendientes):
     with open(PENDIENTES_FILE, "w", encoding="utf-8") as f:
         json.dump(pendientes, f, ensure_ascii=False, indent=2)
+
+def cargar_ignoradas():
+    """Carga la lista de URLs ignoradas desde ignoradas.json"""
+    if IGNORADAS_FILE.exists():
+        try:
+            with open(IGNORADAS_FILE, "r", encoding="utf-8") as f:
+                contenido = f.read().strip()
+                if contenido:
+                    return json.loads(contenido)
+        except (json.JSONDecodeError, ValueError):
+            log("⚠️ ignoradas.json corrupto, iniciando desde cero")
+    return []
+
+def guardar_ignoradas(ignoradas):
+    with open(IGNORADAS_FILE, "w", encoding="utf-8") as f:
+        json.dump(ignoradas, f, ensure_ascii=False, indent=2)
 
 def cargar_titulos_publicados():
     """Extrae títulos de noticias ya publicadas desde los archivos HTML en noticias/"""
@@ -216,6 +233,11 @@ def main():
     pendientes = cargar_pendientes()
     urls_existentes = {p["url_google"] for p in pendientes}
     
+    # Cargar ignoradas (URLs que el usuario descartó)
+    ignoradas = cargar_ignoradas()
+    urls_ignoradas = {i["url_google"] for i in ignoradas}
+    log("  " + str(len(ignoradas)) + " URLs ignoradas (descartadas por el usuario)")
+    
     # Cargar títulos de noticias ya publicadas para deduplicación semántica
     log("Cargando títulos de noticias publicadas...")
     titulos_publicados = cargar_titulos_publicados()
@@ -242,8 +264,12 @@ def main():
         log("Leyendo feed: " + feed_url)
         items = obtener_feed_google_news(feed_url)
         for item in items:
-            # Saltar si ya existe
+            # Saltar si ya está en pendientes
             if item["url_google"] in urls_existentes:
+                continue
+            # Saltar si fue ignorada (descartada por el usuario)
+            if item["url_google"] in urls_ignoradas:
+                log("  ⏭ Ignorada (descartada anteriormente): " + item["titulo"][:80])
                 continue
             # Saltar si es muy vieja
             item_fecha = datetime.strptime(item["fecha"], "%Y-%m-%d %H:%M:%S") if item["fecha"] else None
