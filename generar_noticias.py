@@ -96,6 +96,15 @@ def cargar_titulos_publicados():
             pass
     return titulos
 
+def cargar_titulos_ignoradas():
+    """Carga títulos de noticias ignoradas desde ignoradas.json"""
+    titulos = []
+    ignoradas = cargar_ignoradas()
+    for item in ignoradas:
+        if "titulo" in item and item["titulo"]:
+            titulos.append(item["titulo"])
+    return titulos
+
 def cargar_titulos_borradas():
     """Carga títulos de noticias borradas desde borradas.txt si existe"""
     titulos = []
@@ -126,20 +135,29 @@ def es_noticia_duplicada(nuevo_titulo, titulos_existentes):
     if not titulos_existentes:
         return False
     
+    # Primero: comparación rápida por similitud de texto (Jaccard)
+    nuevo_norm = normalizar_texto(nuevo_titulo)
+    nuevo_palabras = set(nuevo_norm.split())
+    
+    for titulo in titulos_existentes:
+        existente_norm = normalizar_texto(titulo)
+        existente_palabras = set(existente_norm.split())
+        
+        if len(nuevo_palabras) > 0 and len(existente_palabras) > 0:
+            interseccion = nuevo_palabras & existente_palabras
+            union = nuevo_palabras | existente_palabras
+            similitud = len(interseccion) / len(union)
+            
+            # Si comparten más del 50% de palabras, es duplicado
+            if similitud >= 0.5:
+                return True
+            
+            # Si uno contiene al otro (título muy similar)
+            if nuevo_norm in existente_norm or existente_norm in nuevo_norm:
+                return True
+    
+    # Si no hay coincidencia por Jaccard, usar OpenAI si está disponible
     if not OPENAI_API_KEY or not client:
-        # Sin API, usar comparación simple por palabras clave
-        nuevo_norm = normalizar_texto(nuevo_titulo)
-        for titulo in titulos_existentes:
-            existente_norm = normalizar_texto(titulo)
-            # Si comparten más del 60% de palabras significativas, es duplicado
-            nuevo_palabras = set(nuevo_norm.split())
-            existente_palabras = set(existente_norm.split())
-            if len(nuevo_palabras) > 0:
-                interseccion = nuevo_palabras & existente_palabras
-                union = nuevo_palabras | existente_palabras
-                similitud = len(interseccion) / len(union)
-                if similitud > 0.6:
-                    return True
         return False
     
     # Con OpenAI: comparar solo con los últimos 30 títulos para no gastar tokens
@@ -243,6 +261,15 @@ def main():
     titulos_publicados = cargar_titulos_publicados()
     log("  " + str(len(titulos_publicados)) + " noticias publicadas encontradas")
     
+    # Cargar títulos de noticias ignoradas para deduplicación
+    log("Cargando títulos de noticias ignoradas...")
+    titulos_ignoradas = cargar_titulos_ignoradas()
+    log("  " + str(len(titulos_ignoradas)) + " noticias ignoradas encontradas")
+    
+    # Combinar todos los títulos conocidos para deduplicación
+    todos_titulos_conocidos = titulos_publicados + titulos_ignoradas
+    log("  Total títulos conocidos para deduplicación: " + str(len(todos_titulos_conocidos)))
+    
     # Feeds de Google News
     feeds = [
         "https://news.google.com/rss/search?q=TikTok&hl=es&gl=ES&ceid=ES:es",
@@ -276,9 +303,9 @@ def main():
             if item_fecha and item_fecha < limite:
                 continue
             
-            # Deduplicación semántica: no añadir si es el mismo tema que una ya publicada
-            if es_noticia_duplicada(item["titulo"], titulos_publicados):
-                log("  ⏭ Duplicado semántico (ya publicado): " + item["titulo"][:80])
+            # Deduplicación semántica: no añadir si es el mismo tema que una ya publicada o ignorada
+            if es_noticia_duplicada(item["titulo"], todos_titulos_conocidos):
+                log("  ⏭ Duplicado semántico (ya publicado/ignorado): " + item["titulo"][:80])
                 continue
             
             # También verificar contra pendientes existentes (por si acaso)
