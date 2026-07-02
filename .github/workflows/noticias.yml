@@ -35,6 +35,9 @@ jobs:
       continue-on-error: true
       timeout-minutes: 1
       run: |
+        # Crear directorio panel si no existe
+        mkdir -p panel
+        # Descargar borradas.txt
         curl -fsSL --connect-timeout 10 -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt"
         # Descargar pendientes.json del servidor para no duplicar
         curl -fsSL --connect-timeout 10 -o pendientes.json "https://tikpanel.app/panel/pendientes.json" && echo "pendientes.json descargado del servidor" || echo "No hay pendientes.json en el servidor, iniciando desde cero"
@@ -47,6 +50,11 @@ jobs:
         if [ ! -s ignoradas.json ]; then
           echo "[]" > ignoradas.json
           echo "ignoradas.json inicializado vacío"
+        fi
+        # Descargar noticias publicadas del servidor para deduplicación
+        curl -fsSL --connect-timeout 10 -o noticias_servidor.html "https://tikpanel.app/noticias/" || echo "No se pudo descargar listado de noticias"
+        if [ -f noticias_servidor.html ]; then
+          echo "Listado de noticias del servidor descargado"
         fi
 
     - name: Verificar secrets
@@ -95,11 +103,11 @@ jobs:
           <p><strong>Errores:</strong> ${{ steps.resumen.outputs.errores }}</p>
           <p><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">Ver detalles en GitHub Actions</a></p>
 
-    - name: Commit y push de pendientes.json e ignoradas.json al repo (backup)
+    - name: Commit y push de pendientes.json, ignoradas.json y borradas.txt al repo (backup)
       run: |
         git config user.name "TikPanel Bot"
         git config user.email "bot@tikpanel.app"
-        git add pendientes.json ignoradas.json
+        git add pendientes.json ignoradas.json panel/borradas.txt
         if git diff --staged --quiet; then
           echo "No hay cambios nuevos"
         else

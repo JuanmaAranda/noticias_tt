@@ -80,8 +80,10 @@ def guardar_ignoradas(ignoradas):
         json.dump(ignoradas, f, ensure_ascii=False, indent=2)
 
 def cargar_urls_publicadas():
-    """Extrae URLs de fuente original de noticias ya publicadas desde los archivos HTML"""
+    """Extrae URLs de fuente original de noticias ya publicadas desde los archivos HTML
+    locales y también del listado del servidor si está disponible."""
     urls = []
+    # 1. Leer desde archivos HTML locales
     for html_file in NOTICIAS_DIR.glob("*.html"):
         if html_file.name == "index.html":
             continue
@@ -96,11 +98,29 @@ def cargar_urls_publicadas():
                         urls.append(url)
         except Exception:
             pass
+    
+    # 2. Leer desde noticias_servidor.html descargado del workflow
+    servidor_file = Path("noticias_servidor.html")
+    if servidor_file.exists():
+        try:
+            with open(servidor_file, "r", encoding="utf-8") as f:
+                html = f.read()
+                # Extraer URLs de fuente original de las noticias del servidor
+                matches = re.findall(r'<a href="([^"]+)"[^>]*>fuente original', html)
+                for url in matches:
+                    url = url.strip()
+                    if url and url != "#" and url not in urls:
+                        urls.append(url)
+        except Exception:
+            pass
+    
     return urls
 
 def cargar_titulos_publicados():
-    """Extrae títulos de noticias ya publicadas desde los archivos HTML en noticias/"""
+    """Extrae títulos de noticias ya publicadas desde archivos HTML locales
+    y también del listado del servidor si está disponible."""
     titulos = []
+    # 1. Leer desde archivos HTML locales
     for html_file in NOTICIAS_DIR.glob("*.html"):
         if html_file.name == "index.html":
             continue
@@ -113,6 +133,28 @@ def cargar_titulos_publicados():
                     titulos.append(match.group(1).strip())
         except Exception:
             pass
+    
+    # 2. Leer desde noticias_servidor.html descargado del workflow
+    servidor_file = Path("noticias_servidor.html")
+    if servidor_file.exists():
+        try:
+            with open(servidor_file, "r", encoding="utf-8") as f:
+                html = f.read()
+                # Extraer títulos del <title> tag
+                matches = re.findall(r"<title>(.+?)\s*\|", html)
+                for titulo in matches:
+                    titulo = titulo.strip()
+                    if titulo and titulo not in titulos:
+                        titulos.append(titulo)
+                # También extraer de h2/h3 que contienen títulos de noticias
+                matches_h2 = re.findall(r'<h[23][^>]*>(.+?)</h[23]>', html, re.DOTALL)
+                for match in matches_h2:
+                    titulo = re.sub(r'<[^>]+>', '', match).strip()
+                    if titulo and titulo not in titulos and len(titulo) > 10:
+                        titulos.append(titulo)
+        except Exception:
+            pass
+    
     return titulos
 
 def cargar_titulos_ignoradas():
@@ -125,8 +167,11 @@ def cargar_titulos_ignoradas():
     return titulos
 
 def cargar_titulos_borradas():
-    """Carga títulos de noticias borradas desde borradas.txt si existe"""
-    titulos = []
+    """Carga títulos de noticias borradas desde panel/borradas.txt y también
+    extrae títulos de noticias ya publicadas en noticias/ para deduplicación."""
+    titulos = set()
+    
+    # 1. Cargar desde borradas.txt (slugs de noticias eliminadas por el usuario)
     borradas_file = Path("panel/borradas.txt")
     if borradas_file.exists():
         try:
@@ -134,12 +179,35 @@ def cargar_titulos_borradas():
                 for line in f:
                     line = line.strip()
                     if line and line.endswith(".html"):
-                        # El archivo borrado es un slug, no tenemos el título
-                        # Pero podemos intentar leerlo del estado si existe
-                        pass
+                        # El slug está en formato: slug-de-la-noticia.html
+                        # Convertir a título aproximado para deduplicación
+                        slug = line.replace(".html", "")
+                        # Convertir guiones a espacios para comparación
+                        titulo_aprox = slug.replace("-", " ").replace("_", " ")
+                        titulos.add(titulo_aprox)
         except Exception:
             pass
-    return titulos
+    
+    # 2. IMPORTANTE: También cargar títulos de noticias ya publicadas en noticias/
+    # Esto previene que noticias ya publicadas (subidas por FTP) vuelvan a aparecer
+    for html_file in NOTICIAS_DIR.glob("*.html"):
+        if html_file.name == "index.html":
+            continue
+        try:
+            with open(html_file, "r", encoding="utf-8") as f:
+                html = f.read()
+                # Extraer título del <title> tag
+                match = re.search(r"<title>(.+?)\s*\|", html)
+                if match:
+                    titulos.add(match.group(1).strip())
+                # También extraer del h1 si existe
+                match_h1 = re.search(r'<h1[^>]*>(.+?)</h1>', html, re.DOTALL)
+                if match_h1:
+                    titulos.add(re.sub(r'<[^>]+>', '', match_h1.group(1)).strip())
+        except Exception:
+            pass
+    
+    return list(titulos)
 
 def normalizar_texto(texto):
     if not texto:
@@ -150,65 +218,56 @@ def normalizar_texto(texto):
     return texto
 
 def es_noticia_duplicada(nuevo_titulo, titulos_existentes):
-    """Usa OpenAI para determinar si una noticia nueva es conceptualmente un duplicado de alguna existente."""
+    """Usa comparación por similitud de texto para determinar si una noticia nueva es conceptualmente un duplicado."""
     if not titulos_existentes:
         return False
     
-    # Primero: comparación rápida por similitud de texto (Jaccard)
     nuevo_norm = normalizar_texto(nuevo_titulo)
     nuevo_palabras = set(nuevo_norm.split())
+    
+    # Si el título normalizado es muy corto, no podemos comparar bien
+    if len(nuevo_palabras) < 3:
+        return False
     
     for titulo in titulos_existentes:
         existente_norm = normalizar_texto(titulo)
         existente_palabras = set(existente_norm.split())
+        
+        if len(existente_palabras) < 3:
+            continue
         
         if len(nuevo_palabras) > 0 and len(existente_palabras) > 0:
             interseccion = nuevo_palabras & existente_palabras
             union = nuevo_palabras | existente_palabras
             similitud = len(interseccion) / len(union)
             
-            # Si comparten más del 30% de palabras, es duplicado
-            if similitud >= 0.3:
+            # Si comparten más del 50% de palabras, es muy probable que sea duplicado
+            # Subido de 0.30 a 0.50 para evitar falsos positivos
+            if similitud >= 0.50:
+                log(f"  ⏭ Duplicado por similitud de palabras ({similitud:.0%}): '{nuevo_titulo[:60]}' vs '{titulo[:60]}'")
                 return True
             
             # Si uno contiene al otro (título muy similar)
             if nuevo_norm in existente_norm or existente_norm in nuevo_norm:
+                log(f"  ⏭ Duplicado por contención: '{nuevo_titulo[:60]}' vs '{titulo[:60]}'")
                 return True
+            
+            # Si comparten más de 5 palabras significativas (palabras de contenido, no stopwords)
+            stopwords = {"el", "la", "los", "las", "un", "una", "de", "del", "al", "y", "o", "en", "con", "por", "para", "que", "es", "son", "se", "lo", "le", "como", "pero", "mas", "más", "sin", "sobre", "entre", "hasta", "desde", "a", "ante", "bajo", "segun", "según", "tras", "durante", "mediante", "excepto", "salvo", "contra", "hacia", "hasta", "desde", "durante", "the", "a", "an", "and", "or", "of", "to", "in", "on", "at", "by", "for", "with", "about", "into", "through", "during", "before", "after", "above", "below", "from", "up", "down", "out", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "can", "will", "just", "should", "now"}
+            palabras_significativas_nuevo = {p for p in nuevo_palabras if len(p) > 3 and p not in stopwords}
+            palabras_significativas_existente = {p for p in existente_palabras if len(p) > 3 and p not in stopwords}
+            
+            if len(palabras_significativas_nuevo) > 0 and len(palabras_significativas_existente) > 0:
+                interseccion_signif = palabras_significativas_nuevo & palabras_significativas_existente
+                union_signif = palabras_significativas_nuevo | palabras_significativas_existente
+                similitud_signif = len(interseccion_signif) / len(union_signif)
+                
+                # Si comparten más del 60% de palabras significativas
+                if similitud_signif >= 0.60:
+                    log(f"  ⏭ Duplicado por similitud de palabras clave ({similitud_signif:.0%}): '{nuevo_titulo[:60]}' vs '{titulo[:60]}'")
+                    return True
     
-    # Si no hay coincidencia por Jaccard, usar OpenAI si está disponible
-    if not OPENAI_API_KEY or not client:
-        return False
-    
-    # Con OpenAI: comparar solo con los últimos 30 títulos para no gastar tokens
-    titulos_recientes = titulos_existentes[-30:]
-    contexto = "\n".join([f"- {t}" for t in titulos_recientes])
-    
-    prompt = (
-        "Eres un editor de noticias. Determina si la siguiente noticia NUEVA trata sobre "
-        "EL MISMO TEMA o HECHO que alguna de las YA PUBLICADAS, aunque esté redactada con palabras diferentes.\n\n"
-        "NOTICIAS YA PUBLICADAS (últimas 30):\n"
-        f"{contexto}\n\n"
-        f"NUEVA NOTICIA: {nuevo_titulo}\n\n"
-        "Responde ÚNICAMENTE con 'DUPLICADO' si trata del mismo tema/hecho, "
-        "o 'NUEVO' si es un tema completamente diferente.\n"
-        "Respuesta:"
-    )
-    
-    try:
-        respuesta = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "Solo respondes 'DUPLICADO' o 'NUEVO'."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.0,
-            max_tokens=5
-        )
-        veredicto = respuesta.choices[0].message.content.strip().upper()
-        return "DUPLICADO" in veredicto
-    except Exception as e:
-        log("   ⚠️ Error en deduplicación por IA: " + str(e))
-        return False
+    return False
 
 def parsear_fecha(fecha_str):
     formatos = [
@@ -293,8 +352,13 @@ def main():
     titulos_ignoradas = cargar_titulos_ignoradas()
     log("  " + str(len(titulos_ignoradas)) + " noticias ignoradas encontradas")
     
-    # Combinar todos los títulos conocidos para deduplicación
-    todos_titulos_conocidos = titulos_publicados + titulos_ignoradas
+    # Cargar títulos de noticias borradas para deduplicación
+    log("Cargando títulos de noticias borradas...")
+    titulos_borradas = cargar_titulos_borradas()
+    log("  " + str(len(titulos_borradas)) + " títulos de borradas/publicadas encontrados")
+    
+    # Combinar todos los títulos conocidos para deduplicación (publicadas + ignoradas + borradas)
+    todos_titulos_conocidos = list(set(titulos_publicados + titulos_ignoradas + titulos_borradas))
     log("  Total títulos conocidos para deduplicación: " + str(len(todos_titulos_conocidos)))
     
     # Feeds de Google News
