@@ -39,6 +39,8 @@ jobs:
         mkdir -p panel
         # Descargar borradas.txt
         curl -fsSL --connect-timeout 10 -o panel/borradas.txt "https://tikpanel.app/panel/borradas.txt" || echo "No hay borradas.txt"
+        # Descargar borradas.json (títulos completos de noticias borradas)
+        curl -fsSL --connect-timeout 10 -o panel/borradas.json "https://tikpanel.app/panel/borradas.json" && echo "borradas.json descargado del servidor" || echo "No hay borradas.json en el servidor"
         # Descargar pendientes.json del servidor para no duplicar
         curl -fsSL --connect-timeout 10 -o pendientes.json "https://tikpanel.app/panel/pendientes.json" && echo "pendientes.json descargado del servidor" || echo "No hay pendientes.json en el servidor, iniciando desde cero"
         if [ ! -s pendientes.json ]; then
@@ -107,7 +109,7 @@ jobs:
       run: |
         git config user.name "TikPanel Bot"
         git config user.email "bot@tikpanel.app"
-        git add pendientes.json ignoradas.json panel/borradas.txt
+        git add pendientes.json ignoradas.json panel/borradas.txt panel/borradas.json
         if git diff --staged --quiet; then
           echo "No hay cambios nuevos"
         else

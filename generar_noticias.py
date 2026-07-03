@@ -167,11 +167,23 @@ def cargar_titulos_ignoradas():
     return titulos
 
 def cargar_titulos_borradas():
-    """Carga títulos de noticias borradas desde panel/borradas.txt y también
-    extrae títulos de noticias ya publicadas en noticias/ para deduplicación."""
+    """Carga títulos de noticias borradas desde panel/borradas.json (títulos completos)
+    y panel/borradas.txt (slugs) como fallback."""
     titulos = set()
     
-    # 1. Cargar desde borradas.txt (slugs de noticias eliminadas por el usuario)
+    # 1. Cargar desde borradas.json (títulos completos guardados por el panel)
+    borradas_json_file = Path("panel/borradas.json")
+    if borradas_json_file.exists():
+        try:
+            with open(borradas_json_file, "r", encoding="utf-8") as f:
+                borradas = json.load(f)
+                for item in borradas:
+                    if "titulo" in item and item["titulo"]:
+                        titulos.add(item["titulo"])
+        except Exception:
+            pass
+    
+    # 2. Cargar desde borradas.txt (slugs de noticias eliminadas por el usuario)
     borradas_file = Path("panel/borradas.txt")
     if borradas_file.exists():
         try:
@@ -188,7 +200,7 @@ def cargar_titulos_borradas():
         except Exception:
             pass
     
-    # 2. IMPORTANTE: También cargar títulos de noticias ya publicadas en noticias/
+    # 3. IMPORTANTE: También cargar títulos de noticias ya publicadas en noticias/
     # Esto previene que noticias ya publicadas (subidas por FTP) vuelvan a aparecer
     for html_file in NOTICIAS_DIR.glob("*.html"):
         if html_file.name == "index.html":
@@ -241,10 +253,19 @@ def es_noticia_duplicada(nuevo_titulo, titulos_existentes):
             union = nuevo_palabras | existente_palabras
             similitud = len(interseccion) / len(union)
             
-            # Si comparten más del 50% de palabras, es muy probable que sea duplicado
-            # Subido de 0.30 a 0.50 para evitar falsos positivos
-            if similitud >= 0.50:
+            # Si comparten más del 35% de palabras, es muy probable que sea duplicado
+            # Bajado de 0.50 a 0.35 para capturar más duplicados semánticos
+            if similitud >= 0.35:
                 log(f"  ⏭ Duplicado por similitud de palabras ({similitud:.0%}): '{nuevo_titulo[:60]}' vs '{titulo[:60]}'")
+                return True
+            
+            # Detección de palabras clave compartidas: nombres propios, números, términos técnicos
+            # Si comparten 3+ palabras clave específicas, es muy probable que sea el mismo tema
+            palabras_clave_nuevo = {p for p in nuevo_palabras if len(p) > 4 and p not in stopwords and not p.isdigit()}
+            palabras_clave_existente = {p for p in existente_palabras if len(p) > 4 and p not in stopwords and not p.isdigit()}
+            interseccion_clave = palabras_clave_nuevo & palabras_clave_existente
+            if len(interseccion_clave) >= 3:
+                log(f"  ⏭ Duplicado por palabras clave compartidas ({len(interseccion_clave)}): '{nuevo_titulo[:60]}' vs '{titulo[:60]}'")
                 return True
             
             # Si uno contiene al otro (título muy similar)
@@ -262,8 +283,8 @@ def es_noticia_duplicada(nuevo_titulo, titulos_existentes):
                 union_signif = palabras_significativas_nuevo | palabras_significativas_existente
                 similitud_signif = len(interseccion_signif) / len(union_signif)
                 
-                # Si comparten más del 60% de palabras significativas
-                if similitud_signif >= 0.60:
+                # Si comparten más del 45% de palabras significativas
+                if similitud_signif >= 0.45:
                     log(f"  ⏭ Duplicado por similitud de palabras clave ({similitud_signif:.0%}): '{nuevo_titulo[:60]}' vs '{titulo[:60]}'")
                     return True
     
