@@ -234,6 +234,9 @@ def es_noticia_duplicada(nuevo_titulo, titulos_existentes):
     if not titulos_existentes:
         return False
     
+    # Stopwords para filtrar palabras no significativas
+    stopwords = {"el", "la", "los", "las", "un", "una", "de", "del", "al", "y", "o", "en", "con", "por", "para", "que", "es", "son", "se", "lo", "le", "como", "pero", "mas", "más", "sin", "sobre", "entre", "hasta", "desde", "a", "ante", "bajo", "segun", "según", "tras", "durante", "mediante", "excepto", "salvo", "contra", "hacia", "hasta", "desde", "durante", "the", "a", "an", "and", "or", "of", "to", "in", "on", "at", "by", "for", "with", "about", "into", "through", "during", "before", "after", "above", "below", "from", "up", "down", "out", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "can", "will", "just", "should", "now"}
+    
     nuevo_norm = normalizar_texto(nuevo_titulo)
     nuevo_palabras = set(nuevo_norm.split())
     
@@ -274,7 +277,6 @@ def es_noticia_duplicada(nuevo_titulo, titulos_existentes):
                 return True
             
             # Si comparten más de 5 palabras significativas (palabras de contenido, no stopwords)
-            stopwords = {"el", "la", "los", "las", "un", "una", "de", "del", "al", "y", "o", "en", "con", "por", "para", "que", "es", "son", "se", "lo", "le", "como", "pero", "mas", "más", "sin", "sobre", "entre", "hasta", "desde", "a", "ante", "bajo", "segun", "según", "tras", "durante", "mediante", "excepto", "salvo", "contra", "hacia", "hasta", "desde", "durante", "the", "a", "an", "and", "or", "of", "to", "in", "on", "at", "by", "for", "with", "about", "into", "through", "during", "before", "after", "above", "below", "from", "up", "down", "out", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "can", "will", "just", "should", "now"}
             palabras_significativas_nuevo = {p for p in nuevo_palabras if len(p) > 3 and p not in stopwords}
             palabras_significativas_existente = {p for p in existente_palabras if len(p) > 3 and p not in stopwords}
             
