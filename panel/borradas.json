@@ -1,27 +1,12 @@
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Login | Panel Noticias</title>
-        <style>
-            :root { --bg: #0f0f23; --bg2: #1a1a2e; --surface: #16213e; --border: rgba(0,212,255,0.2); --text: #e0e0ff; --primary: #00d4ff; --danger: #ff4757; }
-            body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-            .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 100%; max-width: 400px; text-align: center; }
-            .login-box h1 { margin-bottom: 1.5rem; color: var(--primary); }
-            .login-box input { width: 100%; padding: 0.75rem; margin-bottom: 1rem; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem; box-sizing: border-box; }
-            .login-box button { width: 100%; padding: 0.75rem; background: var(--primary); border: none; border-radius: 8px; color: #fff; cursor: pointer; font-size: 1rem; }
-            .error { color: var(--danger); margin-bottom: 1rem; }
-        </style>
-    </head>
-    <body>
-        <div class="login-box">
-            <h1>Panel Noticias</h1>
-                        <form method="POST">
-                <input type="password" name="password" placeholder="Contrasena" autofocus>
-                <button type="submit">Entrar</button>
-            </form>
-        </div>
-    </body>
-    </html>
-    
+[
+    {
+        "archivo": "c\u00f3mo-gestionar-una-cuenta-de-tiktok-para-creadores-visuales.html",
+        "titulo": "C\u00f3mo gestionar una cuenta de TikTok para creadores visuales",
+        "fecha": "2026-07-03 13:41:26"
+    },
+    {
+        "archivo": "tiktok-supera-1600-millones-de-usuarios-y-redefine-estrategi.html",
+        "titulo": "TikTok supera 1.600 millones de usuarios y redefine estrategias de contenido",
+        "fecha": "2026-07-03 13:41:32"
+    }
+]
