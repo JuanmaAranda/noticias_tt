@@ -143,6 +143,8 @@ jobs:
           set net:timeout 30
           set net:max-retries 2
           mirror -R -p -f /tmp/noticias_files.txt noticias/ /noticias/
+          # Eliminar index.html para forzar uso de index.php dinámico
+          rm /noticias/index.html
           bye
           " || echo "⚠️ FTP de noticias falló"
         else
