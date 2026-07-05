@@ -132,6 +132,20 @@ jobs:
         bye
         " || echo "⚠️ FTP falló, pero los archivos están en GitHub"
 
+    - name: Eliminar index.html del servidor para forzar index.php dinámico
+      continue-on-error: true
+      run: |
+        lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
+        set ssl:verify-certificate no
+        set net:timeout 30
+        set net:max-retries 2
+        rm /noticias/index.html
+        bye
+        " || echo "⚠️ No se pudo eliminar index.html, puede que no exista"
+
+    - name: Instalar lftp
+      run: sudo apt-get install -y lftp
+
     - name: Subir noticias por FTP (sin index.html, lo genera el panel)
       continue-on-error: true
       run: |
@@ -143,24 +157,8 @@ jobs:
           set net:timeout 30
           set net:max-retries 2
           mirror -R -p -f /tmp/noticias_files.txt noticias/ /noticias/
-          # Eliminar index.html para forzar uso de index.php dinámico
-          rm /noticias/index.html
           bye
           " || echo "⚠️ FTP de noticias falló"
         else
           echo "No hay nuevas noticias para subir"
         fi
-
-    - name: Instalar lftp
-      run: sudo apt-get install -y lftp
-
-    - name: Subir noticias por FTP
-      continue-on-error: true
-      run: |
-        lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
-        set ssl:verify-certificate no
-        set net:timeout 30
-        set net:max-retries 2
-        mirror -R -p noticias/ /noticias/
-        bye
-        " || echo "⚠️ FTP falló, pero las noticias están en GitHub"
