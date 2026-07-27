@@ -117,48 +117,46 @@ jobs:
           git push
         fi
 
-    - name: Instalar lftp
-      run: sudo apt-get install -y lftp
-
-    - name: Subir pendientes.json e ignoradas.json al servidor por FTP
+    - name: Subir pendientes.json e ignoradas.json al servidor (HTTPS, bot_upload.php)
       continue-on-error: true
       run: |
-        lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
-        set ssl:verify-certificate no
-        set net:timeout 30
-        set net:max-retries 2
-        put pendientes.json -o /panel/pendientes.json
-        put ignoradas.json -o /panel/ignoradas.json
-        bye
-        " || echo "⚠️ FTP falló, pero los archivos están en GitHub"
+        subir() {
+          local archivo_local="$1"
+          local ruta_remota="$2"
+          local http_code
+          http_code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.BOT_UPLOAD_TOKEN }}" \
+            --data-binary "@${archivo_local}" \
+            "https://tikpanel.app/panel/bot_upload.php?path=${ruta_remota}")
+          echo "→ ${ruta_remota}: HTTP ${http_code} $(cat /tmp/resp.json)"
+          if [ "$http_code" != "200" ]; then
+            echo "⚠️ Fallo subiendo ${ruta_remota}"
+          fi
+        }
+        subir pendientes.json panel/pendientes.json
+        subir ignoradas.json panel/ignoradas.json
 
     - name: Eliminar index.html del servidor para forzar index.php dinámico
       continue-on-error: true
       run: |
-        lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
-        set ssl:verify-certificate no
-        set net:timeout 30
-        set net:max-retries 2
-        rm /noticias/index.html
-        bye
-        " || echo "⚠️ No se pudo eliminar index.html, puede que no exista"
+        http_code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+          -X DELETE \
+          -H "Authorization: Bearer ${{ secrets.BOT_UPLOAD_TOKEN }}" \
+          "https://tikpanel.app/panel/bot_upload.php?path=noticias/index.html")
+        echo "→ borrar index.html: HTTP ${http_code} $(cat /tmp/resp.json)"
 
-    - name: Instalar lftp
-      run: sudo apt-get install -y lftp
-
-    - name: Subir noticias por FTP (sin index.html, lo genera el panel)
+    - name: Subir noticias nuevas al servidor (HTTPS, bot_upload.php)
       continue-on-error: true
       run: |
-        # Crear lista de archivos a subir (excluyendo index.html)
-        find noticias/ -name "*.html" ! -name "index.html" > /tmp/noticias_files.txt
-        if [ -s /tmp/noticias_files.txt ]; then
-          lftp -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
-          set ssl:verify-certificate no
-          set net:timeout 30
-          set net:max-retries 2
-          mirror -R -p -f /tmp/noticias_files.txt noticias/ /noticias/
-          bye
-          " || echo "⚠️ FTP de noticias falló"
-        else
-          echo "No hay nuevas noticias para subir"
-        fi
+        shopt -s nullglob
+        for f in noticias/*.html; do
+          nombre=$(basename "$f")
+          if [ "$nombre" = "index.html" ]; then continue; fi
+          http_code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.BOT_UPLOAD_TOKEN }}" \
+            --data-binary "@${f}" \
+            "https://tikpanel.app/panel/bot_upload.php?path=noticias/${nombre}")
+          echo "→ noticias/${nombre}: HTTP ${http_code} $(cat /tmp/resp.json)"
+        done
