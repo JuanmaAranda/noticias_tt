@@ -153,10 +153,11 @@ jobs:
         for f in noticias/*.html; do
           nombre=$(basename "$f")
           if [ "$nombre" = "index.html" ]; then continue; fi
+          nombre_encoded=$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))" "$nombre")
           http_code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${{ secrets.BOT_UPLOAD_TOKEN }}" \
             --data-binary "@${f}" \
-            "https://tikpanel.app/panel/bot_upload.php?path=noticias/${nombre}")
+            "https://tikpanel.app/panel/bot_upload.php?path=noticias/${nombre_encoded}")
           echo "→ noticias/${nombre}: HTTP ${http_code} $(cat /tmp/resp.json)"
         done
