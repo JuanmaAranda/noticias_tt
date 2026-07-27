@@ -120,33 +120,6 @@ jobs:
     - name: Instalar lftp
       run: sudo apt-get install -y lftp
 
-    - name: DIAGNOSTICO FTP (temporal)
-      continue-on-error: true
-      run: |
-        echo "--- Longitud del secret FTP_PASSWORD (bytes, sin trailing newline de printf) ---"
-        printf '%s' "${{ secrets.FTP_PASSWORD }}" | wc -c
-        echo "--- Bytes en crudo (octal dump) del secret, para detectar espacios/saltos de linea ---"
-        printf '%s' "${{ secrets.FTP_PASSWORD }}" | od -c | tail -5
-        echo "--- Intento de login verboso (protocolo FTP plano) ---"
-        lftp -d -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" 82.29.185.65 -e "
-        set ssl:verify-certificate no
-        set net:timeout 15
-        set net:max-retries 1
-        set ftp:ssl-allow no
-        pwd
-        bye
-        " 2>&1 | tail -60
-        echo "--- Intento de login verboso FORZANDO FTPS explicito ---"
-        lftp -d -u "u208113460.github,${{ secrets.FTP_PASSWORD }}" -e "
-        set ssl:verify-certificate no
-        set net:timeout 15
-        set net:max-retries 1
-        set ftp:ssl-force yes
-        set ftp:ssl-protect-data yes
-        pwd
-        bye
-        " ftp://82.29.185.65 2>&1 | tail -60
-
     - name: Subir pendientes.json e ignoradas.json al servidor por FTP
       continue-on-error: true
       run: |
