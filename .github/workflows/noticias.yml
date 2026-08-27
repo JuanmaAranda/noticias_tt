@@ -4,8 +4,6 @@ on:
   schedule:
     - cron: '0 15 * * *'
   workflow_dispatch:
-  repository_dispatch:
-    types: [run-noticias]
 
 permissions:
   contents: write
